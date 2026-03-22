@@ -17,6 +17,7 @@ import com.osfans.trime.core.CompositionProto
 import com.osfans.trime.core.RimeMessage
 import com.osfans.trime.core.SchemaItem
 import com.osfans.trime.daemon.RimeSession
+import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.data.theme.KeyActionManager
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.data.theme.model.TextKeyboard
@@ -78,7 +79,11 @@ class KeyboardWindow :
         get() = KeyboardWindow
 
     private val presetKeyboardIds = theme.presetKeyboards.keys.toList()
+    private val internalPrefs = AppPrefs.defaultInstance().internal
+    private var initializeKeyboardId = internalPrefs.initializeKeyboardId.getValue()
+    private val keyboardSourceMap = mutableMapOf<String, String>()
     private var currentKeyboardId = ""
+    private var lastSchemaId = ""
     private var lastKeyboardId = ""
     private var lastLockKeyboardId = ""
     private var tempAsciiMode: Boolean? = null
@@ -107,7 +112,14 @@ class KeyboardWindow :
     override fun onCreateView(): View {
         keyboardView = context.frameLayout(R.id.keyboard_view)
         keyboardView.addOnLayoutChangeListener(onKeyboardViewLayoutChangeListener)
-        attachKeyboard(evalKeyboard(".default"))
+
+        restoreKeyboardSourceMap()
+        // 使用记忆的键盘ID，否则根据方案匹配
+        val targetKeyboardId = initializeKeyboardId.takeIf {
+            it.isNotEmpty() && presetKeyboardIds.contains(it)
+        } ?: ".default"
+
+        attachKeyboard(evalKeyboard(targetKeyboardId))
         return keyboardView
     }
 
@@ -218,6 +230,24 @@ class KeyboardWindow :
         return if (presetKeyboardIds.contains(layout)) layout else "default"
     }
 
+    private fun persistKeyboardSourceMap() {
+        val serialized = keyboardSourceMap.entries
+            .joinToString(",") { "${it.key}:${it.value}" }
+        internalPrefs.previousKeyboardIds.setValue(serialized)
+    }
+
+    private fun restoreKeyboardSourceMap() {
+        val serialized = internalPrefs.previousKeyboardIds.getValue()
+        serialized.takeIf { it.isNotEmpty() }?.split(",")
+            ?.mapNotNull { entry ->
+                entry.split(":").takeIf { it.size == 2 }?.let { (target, source) ->
+                    target to source
+                }?.takeIf { (target, source) ->
+                    target in presetKeyboardIds && source in presetKeyboardIds
+                }
+            }?.toMap(keyboardSourceMap)
+    }
+
     private fun evalKeyboard(id: String): String {
         val currentIdx = presetKeyboardIds.indexOfFirst { currentKeyboardId == it }
         val dot =
@@ -226,6 +256,7 @@ class KeyboardWindow :
                 ".prior" -> presetKeyboardIds.getOrNull(currentIdx - 1) ?: currentKeyboardId
                 ".next" -> presetKeyboardIds.getOrNull(currentIdx + 1) ?: currentKeyboardId
                 ".last" -> lastKeyboardId
+                ".previous" -> keyboardSourceMap[currentKeyboardId] ?: currentKeyboardId
                 ".last_lock" -> lastLockKeyboardId
                 ".ascii" -> {
                     var ascii = currentKeyboard?.asciiKeyboard
@@ -242,6 +273,12 @@ class KeyboardWindow :
             }
         var final = dot.ifEmpty { smartMatchKeyboard() }
 
+        // 记忆最终键盘ID（排除横屏键盘）
+        if (final != currentKeyboardId) {
+            initializeKeyboardId = final
+            internalPrefs.initializeKeyboardId.setValue(final)
+        }
+
         // 切换到横屏布局
         if (service.isLandscapeMode()) {
             val landscape =
@@ -256,6 +293,11 @@ class KeyboardWindow :
         ContextCompat.getMainExecutor(service).execute {
             if (cachedKeyboards.containsKey(target)) {
                 if (target == currentKeyboardId) return@execute
+            }
+            // 保存上一个键盘ID，用于来源键盘回退（如果不是返回类操作且不是重新弹出则记录）
+            if (to.isNotEmpty() && to !in setOf(".previous", ".last_lock")) {
+                keyboardSourceMap[target] = currentKeyboardId
+                persistKeyboardSourceMap()
             }
             detachCurrentView()
             attachKeyboard(target)
@@ -351,7 +393,16 @@ class KeyboardWindow :
     }
 
     override fun onRimeSchemaUpdated(schema: SchemaItem) {
-        switchKeyboard(".default")
+        // 方案变化时按方案匹配键盘；方案未变化（如部署重启后的初始通知）时恢复记忆的键盘
+        val schemaChanged = schema.id != lastSchemaId
+        lastSchemaId = schema.id
+        switchKeyboard(
+            if (schemaChanged) {
+                ".default"
+            } else {
+                initializeKeyboardId.takeIf { it.isNotEmpty() && presetKeyboardIds.contains(it) } ?: ".default"
+            },
+        )
     }
 
     override fun onRimeOptionUpdated(value: RimeMessage.OptionMessage.Data) {
