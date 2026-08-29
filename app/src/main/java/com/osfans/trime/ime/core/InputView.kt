@@ -12,6 +12,7 @@ import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.widget.ImageView
+import androidx.annotation.Keep
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -21,6 +22,7 @@ import com.osfans.trime.core.CompositionProto
 import com.osfans.trime.core.RimeMessage
 import com.osfans.trime.daemon.RimeSession
 import com.osfans.trime.data.prefs.AppPrefs
+import com.osfans.trime.data.prefs.PreferenceDelegate
 import com.osfans.trime.data.theme.ColorManager
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.ime.bar.InputBarDelegate
@@ -34,6 +36,7 @@ import com.osfans.trime.ime.keyboard.KeyboardWindow
 import com.osfans.trime.ime.popup.PopupDelegate
 import com.osfans.trime.ime.symbol.LiquidWindow
 import com.osfans.trime.ime.window.BoardWindowManager
+import com.osfans.trime.util.isLandscape
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.kodein.di.instance
@@ -105,6 +108,17 @@ class InputView(
 
     private val candidatesMode by AppPrefs.defaultInstance().candidates.mode
 
+    private val oneHandMode = AppPrefs.defaultInstance().keyboard.oneHandMode
+
+    @Keep
+    private val oneHandModeListener =
+        PreferenceDelegate.OnChangeListener<Int> { _, _ ->
+            ContextCompat.getMainExecutor(service).execute {
+                updateKeyboardSize()
+                keyboardWindow.refreshKeyboards(true)
+            }
+        }
+
     private val keyboardSidePadding = theme.generalStyle.keyboardPadding
     private val keyboardSidePaddingLandscape = theme.generalStyle.keyboardPaddingLand
     private val keyboardBottomPadding = theme.generalStyle.keyboardPaddingBottom
@@ -142,6 +156,7 @@ class InputView(
     init {
         // MUST call before any operation
         inputDepMgr.start()
+        oneHandMode.registerOnChangeListener(oneHandModeListener)
 
         windowManager.cacheResidentWindow(keyboardWindow, createView = true)
         windowManager.cacheResidentWindow(liquidWindow)
@@ -238,9 +253,24 @@ class InputView(
         bottomPaddingSpace.updateLayoutParams {
             height = keyboardBottomPaddingPx
         }
-        val sidePadding = keyboardSidePaddingPx
+
+        // 0 normal, 1 left-hand, 2 right-hand
+        val state = oneHandMode.getValue()
+        val isPortrait = !context.resources.configuration.isLandscape()
+
+        val leftSidePadding = if (isPortrait && state == 2) {
+            theme.generalStyle.keyboardPaddingLeft.takeIf { it > 0 }?.let { dp(it) } ?: keyboardSidePaddingPx
+        } else {
+            keyboardSidePaddingPx
+        }
+        val rightSidePadding = if (isPortrait && state == 1) {
+            theme.generalStyle.keyboardPaddingRight.takeIf { it > 0 }?.let { dp(it) } ?: keyboardSidePaddingPx
+        } else {
+            keyboardSidePaddingPx
+        }
+
         val unset = LayoutParams.UNSET
-        if (sidePadding == 0) {
+        if (leftSidePadding == 0 && rightSidePadding == 0) {
             // hide side padding space views when unnecessary
             leftPaddingSpace.visibility = View.GONE
             rightPaddingSpace.visibility = View.GONE
@@ -254,10 +284,10 @@ class InputView(
             leftPaddingSpace.visibility = View.VISIBLE
             rightPaddingSpace.visibility = View.VISIBLE
             leftPaddingSpace.updateLayoutParams {
-                width = sidePadding
+                width = leftSidePadding
             }
             rightPaddingSpace.updateLayoutParams {
-                width = sidePadding
+                width = rightSidePadding
             }
             windowManager.view.updateLayoutParams<LayoutParams> {
                 startToStart = unset
@@ -266,8 +296,8 @@ class InputView(
                 endToStartOf(rightPaddingSpace)
             }
         }
-        preedit.ui.root.setPadding(sidePadding, 0, sidePadding, 0)
-        inputBar.view.setPadding(sidePadding, 0, sidePadding, 0)
+        preedit.ui.root.setPadding(leftSidePadding, 0, rightSidePadding, 0)
+        inputBar.view.setPadding(leftSidePadding, 0, rightSidePadding, 0)
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
@@ -341,6 +371,7 @@ class InputView(
         // cancel the notification job and clear all broadcast receivers,
         // implies that InputView should not be attached again after detached.
         updateWindowViewHeightJob.cancel()
+        oneHandMode.unregisterOnChangeListener(oneHandModeListener)
         popup.root.removeAllViews()
         inputDepMgr.stop()
         super.onDetachedFromWindow()

@@ -191,6 +191,7 @@ class CommonKeyboardActionListener {
                     "select_candidate" -> handleSelectCandidate(arg)
                     "switch_hide_key_symbol" -> switchHideKeySymbol()
                     "switch_hide_key_hint" -> switchHideKeyHint()
+                    "switch_one_hand_mode" -> switchOneHandMode()
                     else -> handleIntentAction(action.command, arg)
                 }
             }
@@ -301,6 +302,11 @@ class CommonKeyboardActionListener {
             private fun switchHideKeyHint() {
                 val preference = prefs.keyboard.hideKeyHint
                 preference.setValue(!preference.getValue())
+            }
+
+            private fun switchOneHandMode() {
+                val preference = prefs.keyboard.oneHandMode
+                preference.setValue((preference.getValue() + 1) % 3)
             }
 
             private fun handleSettings(action: KeyAction) {

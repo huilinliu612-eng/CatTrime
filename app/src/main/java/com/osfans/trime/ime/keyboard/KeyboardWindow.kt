@@ -147,6 +147,23 @@ class KeyboardWindow :
             if (context.isLandscapeMode()) keyboardPaddingLand else keyboardPadding
         }
 
+        fun resolvePadding(configValue: Int) = configValue.takeIf { it > 0 } ?: padding
+
+        // 0 normal, 1 left-hand, 2 right-hand；横屏不参与单手模式
+        val oneHandState = if (isPortrait) {
+            AppPrefs.defaultInstance().keyboard.oneHandMode.getValue()
+        } else {
+            0
+        }
+
+        val (paddingLeft, paddingRight) = when (oneHandState) {
+            1 -> padding to resolvePadding(theme.generalStyle.keyboardPaddingRight)
+            2 -> resolvePadding(theme.generalStyle.keyboardPaddingLeft) to padding
+            else -> padding to padding
+        }
+
+        val totalPadding = paddingLeft + paddingRight
+
         val safeWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val windowMetrics = context.windowManager.maximumWindowMetrics
             val insets = windowMetrics.windowInsets.getInsetsIgnoringVisibility(
@@ -163,7 +180,7 @@ class KeyboardWindow :
             size.x
         }
 
-        val width = safeWidth - 2 * context.dp(padding)
+        val width = safeWidth - context.dp(totalPadding)
         allowedWidth = width
         return width
     }
