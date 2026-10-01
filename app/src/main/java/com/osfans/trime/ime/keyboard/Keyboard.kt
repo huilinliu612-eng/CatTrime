@@ -112,10 +112,23 @@ class Keyboard(
     val asciiKeyboard: String? = selfConfig?.asciiKeyboard // 英文鍵盤
 
     val keyboardHeight: Int =
-        intArrayOf(
-            selfConfig?.let { getKeyboardHeightFromKeyboardConfig(it) } ?: 0,
-            getKeyboardHeightFromTheme(theme),
-        ).firstOrNull { it > 0 } ?: 0
+        resolvePositive(
+            selfConfig?.let {
+                pickLandscape(it.keyboardHeight, it.keyboardHeightLand, context.isLandscapeMode())
+            },
+            pickLandscape(
+                theme.generalStyle.keyboardHeight,
+                theme.generalStyle.keyboardHeightLand,
+                context.isLandscapeMode(),
+            ),
+        ) { context.dp(it) }.let { resolvedHeight ->
+            val keyboardPrefs = AppPrefs.defaultInstance().keyboard
+            if (keyboardPrefs.floatingKeyboard.getValue()) {
+                (resolvedHeight * keyboardPrefs.floatingKeyboardHeight.getValue() / 100f).toInt()
+            } else {
+                resolvedHeight
+            }
+        }
 
     private val expandKeypressArea: Boolean by AppPrefs.defaultInstance().keyboard.expandKeypressArea
 
@@ -328,24 +341,6 @@ class Keyboard(
         }
     }
 
-    private fun getKeyboardHeightFromTheme(theme: Theme): Int {
-        var keyboardHeight = theme.generalStyle.keyboardHeight
-        if (context.isLandscapeMode()) {
-            val keyboardHeightLand = theme.generalStyle.keyboardHeightLand
-            if (keyboardHeightLand > 0) keyboardHeight = keyboardHeightLand
-        }
-        return context.dp(keyboardHeight)
-    }
-
-    private fun getKeyboardHeightFromKeyboardConfig(textKeyboard: TextKeyboard): Int {
-        var keyboardHeight = textKeyboard.keyboardHeight
-        if (context.isLandscapeMode()) {
-            val keyboardHeightLand = textKeyboard.keyboardHeightLand
-            if (keyboardHeightLand > 0) keyboardHeight = keyboardHeightLand
-        }
-        return context.dp(keyboardHeight)
-    }
-
     fun setModifierKey(
         c: Int,
         key: Key?,
@@ -371,6 +366,20 @@ class Keyboard(
 
     val keys: List<Key>
         get() = mKeys
+
+    /**
+     * Re-reads the runtime options toggled by the keys of this keyboard.
+     *
+     * Blocks until rime answers, so it belongs to keyboard (re)activation, not
+     * to the draw path.
+     */
+    fun refreshToggleStates() = keys.forEach { it.refreshToggleStates() }
+
+    /** Forwards an option change reported by rime to every key. */
+    fun updateToggleState(
+        option: String,
+        value: Boolean,
+    ) = keys.forEach { it.updateToggleState(option, value) }
 
     private fun setModifier(
         mask: Int,

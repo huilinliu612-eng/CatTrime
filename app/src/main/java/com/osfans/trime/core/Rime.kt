@@ -12,6 +12,8 @@ import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.ime.core.InlinePreeditMode
 import com.osfans.trime.util.appContext
 import com.osfans.trime.util.isStorageAvailable
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -19,7 +21,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * Rime JNI and instance methods
@@ -37,18 +41,25 @@ class Rime :
     override val isReady: Boolean
         get() = lifecycle.currentState == RimeLifecycle.State.READY
 
+    // Written by rime's thread and read from the UI thread, so these need a
+    // happens-before edge to publish their updates.
+    @Volatile
     override var schemaCached = RimeSchema(".default")
         private set
 
+    @Volatile
     override var statusCached = StatusProto()
         private set
 
+    @Volatile
     override var compositionCached = CompositionProto()
         private set
 
+    @Volatile
     override var hasMenu: Boolean = false
         private set
 
+    @Volatile
     override var paging: Boolean = false
         private set
 
@@ -88,14 +99,60 @@ class Rime :
         getCurrentRimeSchema() == ".default" // 無方案
     }
 
-    override suspend fun deploy() = withRimeContext {
-        exitRime()
-        startRime(true)
+    override suspend fun deploy() = RimeMaintenanceMutex.withLock {
+        val deployFinished = CompletableDeferred<Boolean>()
+        val deployHandler: (RimeMessage<*>) -> Unit = { message ->
+            if (message is RimeMessage.DeployMessage) {
+                when (message.data) {
+                    RimeMessage.DeployMessage.State.Start -> Unit
+
+                    RimeMessage.DeployMessage.State.Success -> {
+                        deployFinished.complete(true)
+                    }
+
+                    RimeMessage.DeployMessage.State.Failure -> {
+                        deployFinished.complete(false)
+                    }
+                }
+            }
+        }
+        registerRimeMessageHandler(deployHandler)
+        try {
+            withRimeContext {
+                exitRime()
+                startRime(true)
+            }
+            val success =
+                withContext(Dispatchers.IO) {
+                    // withTimeoutOrNull rather than withTimeout: a timeout is a
+                    // maintenance outcome, and letting it throw would surface as
+                    // an uncaught coroutine exception in the callers (the intent
+                    // receiver and the settings screen do not catch it).
+                    withTimeoutOrNull(DEPLOY_TIMEOUT) {
+                        deployFinished.await()
+                    }
+                }
+            // A failed schema build is an expected maintenance result (for example when
+            // a third-party schema dependency is missing). The native message handler
+            // has already published a failure notification, so do not turn it into an
+            // uncaught coroutine exception that crashes the whole IME process.
+            when (success) {
+                null -> Timber.w("Rime deploy timed out")
+                false -> Timber.w("Rime deploy failed")
+                true -> Unit
+            }
+        } finally {
+            unregisterRimeMessageHandler(deployHandler)
+        }
     }
 
-    override suspend fun updateConfig() = withRimeContext {
-        exitRime()
-        startRime(false)
+    // Restarting the engine races with deploy and sync, which also tear the rime
+    // session down and back up. Take the same maintenance lock they do.
+    override suspend fun updateConfig() = RimeMaintenanceMutex.withLock {
+        withRimeContext {
+            exitRime()
+            startRime(false)
+        }
     }
 
     override suspend fun syncUserData(): Boolean = withRimeContext {
@@ -342,8 +399,13 @@ class Rime :
         asciiSwitchTipsJob?.cancel()
         asciiSwitchTipsJob = lifecycleScope.launch {
             delay(1000L)
-            val ctx = getRimeContext()
-            handleRimeMessage(6, arrayOf(ctx.composition))
+            // This scope runs on Dispatchers.Default, but librime is not
+            // thread-safe. Hop onto rime's single thread before touching the
+            // native layer, as every other call site does.
+            withRimeContext {
+                val ctx = getRimeContext()
+                handleRimeMessage(6, arrayOf(ctx.composition))
+            }
         }
     }
 
@@ -378,6 +440,8 @@ class Rime :
     }
 
     companion object {
+        private val DEPLOY_TIMEOUT = 15.minutes
+
         private val messageFlow_ =
             MutableSharedFlow<RimeMessage<*>>(
                 extraBufferCapacity = 15,

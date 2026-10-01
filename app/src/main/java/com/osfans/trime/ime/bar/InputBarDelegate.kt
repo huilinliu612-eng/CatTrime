@@ -6,6 +6,7 @@
 package com.osfans.trime.ime.bar
 
 import android.content.Context
+import android.graphics.drawable.Drawable
 import android.os.Build
 import android.util.Size
 import android.view.View
@@ -59,6 +60,11 @@ import splitties.views.dsl.core.matchParent
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 
+internal fun shouldShowInputBar(
+    hideToolbar: Boolean,
+    state: QuickBarStateMachine.State,
+): Boolean = !hideToolbar || state != QuickBarStateMachine.State.Always
+
 class InputBarDelegate : InputBroadcastReceiver {
     private val di = InputDependencyManager.getInstance().di
     private val context: Context by di.instance()
@@ -74,6 +80,9 @@ class InputBarDelegate : InputBroadcastReceiver {
     private val prefs = AppPrefs.defaultInstance()
 
     private val hideQuickBar by prefs.keyboard.hideInputBar
+
+    private val blendCompactCandidatesIntoFloatingKeyboard =
+        hideQuickBar && prefs.keyboard.floatingKeyboard.getValue()
 
     private val clipboardSuggestion by prefs.clipboard.clipboardSuggestion
 
@@ -139,6 +148,32 @@ class InputBarDelegate : InputBroadcastReceiver {
             hideKeyboardButton.apply {
                 setOnClickListener { service.requestHideSelf(0) }
                 onSwipe = swipeDownHideKeyboardCallback
+            }
+            floatingKeyboardButton.apply {
+                val isFloating = prefs.keyboard.floatingKeyboard.getValue()
+                setIcon(
+                    if (isFloating) {
+                        R.drawable.ic_baseline_keyboard_24
+                    } else {
+                        R.drawable.ic_floating_keyboard_24
+                    },
+                )
+                contentDescription = context.getString(
+                    if (isFloating) {
+                        R.string.dock_keyboard
+                    } else {
+                        R.string.enable_floating_keyboard
+                    },
+                )
+                setOnClickListener {
+                    prefs.keyboard.floatingKeyboard.setValue(
+                        !prefs.keyboard.floatingKeyboard.getValue(),
+                    )
+                }
+                setOnLongClickListener {
+                    AppUtils.launchMainToKeyboard(context)
+                    true
+                }
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
@@ -227,6 +262,9 @@ class InputBarDelegate : InputBroadcastReceiver {
 
     private fun switchUiByState(state: QuickBarStateMachine.State) {
         val index = state.ordinal
+        view.visibility =
+            if (shouldShowInputBar(hideQuickBar, state)) View.VISIBLE else View.GONE
+        view.background = barBackground(state)
         if (view.displayedChild == index) return
         val new = view.getChildAt(index)
         if (new != tabUi.root) {
@@ -240,26 +278,49 @@ class InputBarDelegate : InputBroadcastReceiver {
     val view by lazy {
         ViewAnimator(context).apply {
             visibility =
-                if (hideQuickBar) {
-                    View.GONE
-                } else {
+                if (shouldShowInputBar(hideQuickBar, QuickBarStateMachine.State.Always)) {
                     View.VISIBLE
+                } else {
+                    View.GONE
                 }
-            background =
-                ColorManager.getDecorDrawable(
-                    "candidate_background",
-                    "candidate_border_color",
-                    dp(theme.generalStyle.candidateBorder),
-                    dp(theme.generalStyle.candidateBorderRound),
-                )
+            background = barBackground(QuickBarStateMachine.State.Always)
             add(alwaysUi.root, lParams(matchParent, matchParent))
             add(candidateUi.root, lParams(matchParent, matchParent))
             add(tabUi.root, lParams(matchParent, matchParent))
 
             evalAlwaysUiState()
             ClipboardHelper.addOnUpdateListener(onClipboardUpdateListener)
+            // The helper keeps listeners in a static set, so it has to be
+            // released when this view leaves the window -- otherwise it keeps
+            // notifying a detached view after an input view rebuild.
+            addOnAttachStateChangeListener(
+                object : View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(v: View) = Unit
+
+                    override fun onViewDetachedFromWindow(v: View) {
+                        ClipboardHelper.removeOnUpdateListener(onClipboardUpdateListener)
+                    }
+                },
+            )
             syncToolbarOptionStates()
         }
+    }
+
+    private fun barBackground(state: QuickBarStateMachine.State): Drawable? {
+        if (
+            blendCompactCandidatesIntoFloatingKeyboard &&
+            state == QuickBarStateMachine.State.Candidate
+        ) {
+            // Let the floating keyboard's themed background continue through the
+            // compact candidate row instead of drawing a separate, mismatched panel.
+            return null
+        }
+        return ColorManager.getDecorDrawable(
+            "candidate_background",
+            "candidate_border_color",
+            dp(theme.generalStyle.candidateBorder),
+            dp(theme.generalStyle.candidateBorderRound),
+        )
     }
 
     override fun onStartInput(info: EditorInfo) {

@@ -40,6 +40,7 @@ import splitties.views.dsl.core.frameLayout
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
 import timber.log.Timber
+import java.lang.ref.WeakReference
 
 class KeyboardWindow :
     BoardWindow.NoBarBoardWindow(),
@@ -72,7 +73,15 @@ class KeyboardWindow :
 
     private lateinit var keyboardView: FrameLayout
 
-    companion object : ResidentWindow.Key
+    companion object : ResidentWindow.Key {
+        private var currentKeyboardRef: WeakReference<Keyboard>? = null
+
+        var currentKeyboard: Keyboard
+            get() = currentKeyboardRef?.get() ?: error("No active keyboard")
+            private set(value) {
+                currentKeyboardRef = WeakReference(value)
+            }
+    }
 
     override val key: ResidentWindow.Key
         get() = KeyboardWindow
@@ -152,14 +161,8 @@ class KeyboardWindow :
         return width
     }
 
-    private fun selectKeyboardConfig(name: String): TextKeyboard? {
-        val config = theme.presetKeyboards[name] ?: theme.presetKeyboards["default"]
-        val importPreset = config?.importPreset
-        if (!importPreset.isNullOrEmpty()) {
-            return selectKeyboardConfig(importPreset)
-        }
-        return config
-    }
+    private fun selectKeyboardConfig(name: String): TextKeyboard? =
+        resolveKeyboardConfig(theme.presetKeyboards, name)
 
     private fun attachKeyboard(target: String) {
         currentKeyboardId = target
@@ -189,8 +192,12 @@ class KeyboardWindow :
                 }
             }
 
+            currentKeyboard = it
             // TODO：为避免过量重构，这里暂时将 currentKeyboard 同步到 KeyboardSwitcher
             KeyboardSwitcher.currentKeyboard = it
+            // Keys draw their toggle state from a cache, so seed it once here
+            // instead of querying rime on every frame.
+            it.refreshToggleStates()
         }
 
         view.let {
@@ -356,6 +363,9 @@ class KeyboardWindow :
 
     override fun onRimeOptionUpdated(value: RimeMessage.OptionMessage.Data) {
         val option = value.option
+        // Keep the cached toggle state of the keys in sync for free -- the
+        // message already carries the new value.
+        activeKeyboard?.updateToggleState(option, value.value)
         when {
             option.startsWith("_keyboard_") -> {
                 val target = option.removePrefix("_keyboard_")
