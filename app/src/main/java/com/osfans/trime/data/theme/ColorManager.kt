@@ -102,6 +102,21 @@ object ColorManager {
             "long_text_back_color" to "key_back_color",
         )
 
+    /**
+     * Everything the user can pick between: the theme's presets plus the built-in system dynamic
+     * scheme.
+     *
+     * The dynamic scheme is not a preset, so it has to be appended here — that is what keeps it
+     * in the list no matter what a theme's `preset_color_schemes` declares. It deliberately sorts
+     * last, and a preset that happens to use its reserved id is dropped, so a theme can neither
+     * hide it nor shadow it.
+     */
+    val availableColorSchemes: List<ColorScheme>
+        get() = buildList {
+            addAll(theme.colorSchemes)
+            if (DynamicColorScheme.isSupported) add(DynamicColorScheme.create(isNightMode))
+        }
+
     private var bitmapCache: LruCache<String, Bitmap>? = null
 
     fun interface OnColorChangeListener {
@@ -122,7 +137,13 @@ object ColorManager {
         onChangeListeners.forEach { it.onColorChange(theme) }
     }
 
-    private fun colorScheme(id: String) = theme.colorSchemes.find { it.id == id }
+    private fun colorScheme(id: String): ColorScheme? =
+        if (id == DynamicColorScheme.ID && DynamicColorScheme.isSupported) {
+            // 动态方案跟随系统深浅色，每次解析都按当前模式生成
+            DynamicColorScheme.create(isNightMode)
+        } else {
+            theme.colorSchemes.find { it.id == id }
+        }
 
     fun init(configuration: Configuration) {
         isNightMode = configuration.isNightMode()
@@ -144,32 +165,38 @@ object ColorManager {
         activeColorScheme = evaluateActiveColorScheme()
     }
 
-    private fun evaluateActiveColorScheme(): ColorScheme = when {
-        followSystemDayNight -> {
-            val defaultModeScheme = if (isNightMode) darkModeColorScheme else lightModeColorScheme
-
-            fun resolveScheme(id: String?) = id?.let { colorScheme(it) } ?: defaultModeScheme
-
-            colorScheme(normalModeColor)?.let { userScheme ->
-                val lightSchemeId = userScheme.colors["light_scheme"]
-                val darkSchemeId = userScheme.colors["dark_scheme"]
-
-                when {
-                    lightSchemeId != null && darkSchemeId != null ->
-                        // 如果两者都指定了，根据当前模式选择对应的配色
-                        resolveScheme(if (isNightMode) darkSchemeId else lightSchemeId)
-                    lightSchemeId != null ->
-                        // 如果只指定了light_scheme，说明是暗色方案
-                        if (isNightMode) userScheme else resolveScheme(lightSchemeId)
-                    darkSchemeId != null ->
-                        // 如果只指定了dark_scheme，说明是亮色方案
-                        if (isNightMode) resolveScheme(darkSchemeId) else userScheme
-                    else -> defaultModeScheme
-                }
-            } ?: defaultModeScheme
+    private fun evaluateActiveColorScheme(): ColorScheme {
+        // 动态配色方案本身自适应深浅色，直接返回，跳过 light/dark 级联
+        if (normalModeColor == DynamicColorScheme.ID && DynamicColorScheme.isSupported) {
+            return DynamicColorScheme.create(isNightMode)
         }
-        else -> colorScheme(normalModeColor)
-    } ?: colorScheme("default") ?: theme.colorSchemes.first()
+        return when {
+            followSystemDayNight -> {
+                val defaultModeScheme = if (isNightMode) darkModeColorScheme else lightModeColorScheme
+
+                fun resolveScheme(id: String?) = id?.let { colorScheme(it) } ?: defaultModeScheme
+
+                colorScheme(normalModeColor)?.let { userScheme ->
+                    val lightSchemeId = userScheme.colors["light_scheme"]
+                    val darkSchemeId = userScheme.colors["dark_scheme"]
+
+                    when {
+                        lightSchemeId != null && darkSchemeId != null ->
+                            // 如果两者都指定了，根据当前模式选择对应的配色
+                            resolveScheme(if (isNightMode) darkSchemeId else lightSchemeId)
+                        lightSchemeId != null ->
+                            // 如果只指定了light_scheme，说明是暗色方案
+                            if (isNightMode) userScheme else resolveScheme(lightSchemeId)
+                        darkSchemeId != null ->
+                            // 如果只指定了dark_scheme，说明是亮色方案
+                            if (isNightMode) resolveScheme(darkSchemeId) else userScheme
+                        else -> defaultModeScheme
+                    }
+                } ?: defaultModeScheme
+            }
+            else -> colorScheme(normalModeColor)
+        } ?: colorScheme("default") ?: theme.colorSchemes.first()
+    }
 
     /** 每次切换主题后，都要调用此函数，初始化配色 */
     fun switchTheme(theme: Theme) {

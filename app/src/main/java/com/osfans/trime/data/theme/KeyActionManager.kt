@@ -14,5 +14,11 @@ object KeyActionManager {
 
     fun getAction(token: KeyActionToken): KeyAction = actionCache.getOrPut(token) { KeyAction(token) }
 
+    /** Build an explicit function-key command; a plain token would be treated as text. */
+    fun getCommandAction(command: String): KeyAction = KeyAction(
+        KeyActionToken.Plain(command),
+        mapOf(command to PresetKey(command = command)),
+    )
+
     fun resetCache() = actionCache.clear()
 }

@@ -81,7 +81,7 @@ class InputBarDelegate : InputBroadcastReceiver {
 
     private val hideQuickBar by prefs.keyboard.hideInputBar
 
-    private val blendCompactCandidatesIntoFloatingKeyboard =
+    private var blendCompactCandidatesIntoFloatingKeyboard =
         hideQuickBar && prefs.keyboard.floatingKeyboard.getValue()
 
     private val clipboardSuggestion by prefs.clipboard.clipboardSuggestion
@@ -273,6 +273,24 @@ class InputBarDelegate : InputBroadcastReceiver {
             tabUi.removeExternal()
         }
         view.displayedChild = index
+    }
+
+    /** Apply toolbar preferences without replacing the input view hierarchy. */
+    fun onFloatingKeyboardChanged(isFloating: Boolean) {
+        blendCompactCandidatesIntoFloatingKeyboard = hideQuickBar && isFloating
+        alwaysUi.floatingKeyboardButton.apply {
+            setIcon(
+                if (isFloating) R.drawable.ic_baseline_keyboard_24 else R.drawable.ic_floating_keyboard_24,
+            )
+            contentDescription = context.getString(
+                if (isFloating) R.string.dock_keyboard else R.string.enable_floating_keyboard,
+            )
+        }
+        switchUiByState(barStateMachine.currentState)
+    }
+
+    fun onHideInputBarChanged() {
+        switchUiByState(barStateMachine.currentState)
     }
 
     val view by lazy {
