@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import com.osfans.trime.R
+import com.osfans.trime.data.db.BulkDeleteScope
 import com.osfans.trime.data.db.ClipboardHelper
 import com.osfans.trime.data.db.CollectionHelper
 import com.osfans.trime.data.db.DatabaseBean
@@ -176,12 +177,17 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
             }
             deleteAllButton.setOnClickListener {
                 val currentItem = viewPager.currentItem
+                // Pinned entries are kept: a pin is the user saying "keep this one", so bulk
+                // deletion has to leave them alone. This used to pass haveUnpinned() into a flag
+                // whose sense was inverted, which wiped the pinned entries for good once every
+                // entry was pinned.
+                val scope = BulkDeleteScope.KEEP_PINNED
                 when (currentItem) {
                     0 -> promptDeleteAll {
-                        ClipboardHelper.deleteAll(ClipboardHelper.haveUnpinned())
+                        ClipboardHelper.deleteAll(scope)
                     }
                     else -> promptDeleteAll {
-                        CollectionHelper.deleteAll(CollectionHelper.haveUnpinned())
+                        CollectionHelper.deleteAll(scope)
                     }
                 }
             }

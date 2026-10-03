@@ -103,6 +103,16 @@ object ColorManager {
         )
 
     /**
+     * Whether the built-in dynamic scheme is the active one.
+     *
+     * The one scheme that is not the theme's: it paints keys from its own palette by key *kind*
+     * (see `KeyPalette`), so a key asks this to know that the colour keys the theme bound to it
+     * no longer apply.
+     */
+    val isDynamicSchemeActive: Boolean
+        get() = this::_activeColorScheme.isInitialized && _activeColorScheme.id == DynamicColorScheme.ID
+
+    /**
      * Everything the user can pick between: the theme's presets plus the built-in system dynamic
      * scheme.
      *

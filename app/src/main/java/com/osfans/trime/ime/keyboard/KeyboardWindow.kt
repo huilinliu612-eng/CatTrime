@@ -125,7 +125,7 @@ class KeyboardWindow :
             it.onDetach()
             keyboardView.removeView(it)
         }
-        currentKeyboard?.lastAsciiMode = rime.run { statusCached }.isAsciiMode
+        currentKeyboard?.lastAsciiMode = rime.status.isAsciiMode
     }
 
     /** 计算键盘可用宽度：优先使用已测量的容器宽度，否则回退到系统窗口测量。 */
@@ -182,7 +182,7 @@ class KeyboardWindow :
             if (it.isLock) lastLockKeyboardId = target
             dispatchCapsState(it::setShifted)
 
-            val currentMode = rime.run { statusCached }.isAsciiMode
+            val currentMode = rime.status.isAsciiMode
             val targetMode = if (it.resetAsciiMode) it.asciiMode else it.lastAsciiMode
 
             if (currentMode != targetMode) {
@@ -210,11 +210,11 @@ class KeyboardWindow :
 
     private fun smartMatchKeyboard(): String {
         // 主题的布局中包含方案id，直接采用
-        val currentSchema = rime.run { statusCached }.schemaId
+        val currentSchema = rime.status.schemaId
         if (presetKeyboardIds.contains(currentSchema)) {
             return currentSchema
         }
-        val alphabet = rime.run { schemaCached }.alphabet
+        val alphabet = rime.schema.alphabet
         val layout =
             when {
                 alphabet.all { it.isLetter() } -> "qwerty" // 包含 26 个字母
@@ -307,7 +307,7 @@ class KeyboardWindow :
                 }
             }
         switchKeyboard(targetKeyboard)
-        val isAsciiMode = rime.run { statusCached }.isAsciiMode
+        val isAsciiMode = rime.status.isAsciiMode
         if (targetKeyboard == ".ascii" || targetKeyboard == "number") {
             if (tempAsciiMode == null) {
                 tempAsciiMode = isAsciiMode
@@ -333,7 +333,7 @@ class KeyboardWindow :
     }
 
     private fun dispatchCapsState(setShift: (Boolean, Boolean) -> Unit) {
-        val status = rime.run { statusCached }
+        val status = rime.status
         // TODO: 启用自动首句大写后，点击方向键时，保持Shift锁定状态功能将无法生效
         if (theme.generalStyle.autoCaps && status.isAsciiMode && currentKeyboardView?.isCapsOn == false) {
             setShift(false, cursorCapsMode != 0)
@@ -341,7 +341,7 @@ class KeyboardWindow :
     }
 
     override fun onKeyAppearanceUpdate(composing: Boolean, menu: Boolean, paging: Boolean) {
-        if (!rime.run { statusCached }.isAsciiMode) {
+        if (!rime.status.isAsciiMode) {
             currentKeyboard?.appearanceStateKeys?.forEach { key ->
                 currentKeyboardView?.invalidateKeyByIndex(key.index)
             }
@@ -365,7 +365,7 @@ class KeyboardWindow :
         val option = value.option
         // Keep the cached toggle state of the keys in sync for free -- the
         // message already carries the new value.
-        activeKeyboard?.updateToggleState(option, value.value)
+        currentKeyboard?.updateToggleState(option, value.value)
         when {
             option.startsWith("_keyboard_") -> {
                 val target = option.removePrefix("_keyboard_")

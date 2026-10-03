@@ -167,7 +167,7 @@ class SwitchOptionWindow :
     }
 
     private fun updateSchemaOptionEntries() {
-        val switches = rime.run { schemaCached }.switches
+        val switches = rime.schema.switches
         adapter.submitList(
             listOf(
                 *staticEntries,
