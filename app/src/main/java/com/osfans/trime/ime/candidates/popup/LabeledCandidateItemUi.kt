@@ -59,7 +59,6 @@ class LabeledCandidateItemUi(
     private val itemBackground = AppPrefs.defaultInstance().candidates.itemBackground
     private val itemBackgroundAlpha = AppPrefs.defaultInstance().candidates.itemBackgroundAlpha
 
-
     override val root =
         textView {
             val v = dp(theme.window.itemPadding.vertical)
@@ -190,12 +189,11 @@ internal fun candidateItemBackColor(
     highlightColor: Int,
     itemColor: Int,
     itemAlpha: Int = 255,
-): Int =
-    when {
-        highlighted -> highlightColor
-        fillUnhighlighted -> itemColor.withAlpha(itemAlpha)
-        else -> Color.TRANSPARENT
-    }
+): Int = when {
+    highlighted -> highlightColor
+    fillUnhighlighted -> itemColor.withAlpha(itemAlpha)
+    else -> Color.TRANSPARENT
+}
 
 /**
  * Ratio the text sizes of a shrunk item are multiplied by, alongside [candidateItemScale].

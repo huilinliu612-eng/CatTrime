@@ -4,12 +4,10 @@
 
 dependencyResolutionManagement {
     repositories {
-        maven("https://maven.aliyun.com/repository/google")
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://maven.aliyun.com/repository/gradle-plugin")
         google()
         mavenCentral()
         gradlePluginPortal()
+        maven("https://androidx.dev/storage/snapshots/repository/")
     }
     versionCatalogs {
         create("libs") {

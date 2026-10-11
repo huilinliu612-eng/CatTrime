@@ -20,8 +20,8 @@ import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InlineSuggestionsResponse
 import android.widget.ImageView
-import androidx.annotation.RequiresApi
 import androidx.annotation.DrawableRes
+import androidx.annotation.RequiresApi
 import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
@@ -87,8 +87,7 @@ internal const val FLOATING_KEYBOARD_ELEVATION_DP = 10f
  */
 internal const val POPUP_LAYER_ELEVATION_DP = 24f
 
-internal fun resizedPercent(startPercent: Int, startPixels: Int, deltaPixels: Float, min: Int, max: Int): Int =
-    (startPercent * (startPixels + deltaPixels) / startPixels).roundToInt().coerceIn(min, max)
+internal fun resizedPercent(startPercent: Int, startPixels: Int, deltaPixels: Float, min: Int, max: Int): Int = (startPercent * (startPixels + deltaPixels) / startPixels).roundToInt().coerceIn(min, max)
 
 /**
  * Narrowest the floating keyboard is allowed to get, in dp.
@@ -238,20 +237,19 @@ internal enum class BottomToggle {
  * the bottom-right corner. Docked mode hides both grips and frees the corners, so the row
  * starts in the bottom-left one and the toolbar toggle moves to the bottom-right one.
  */
-internal fun actionHandleAnchors(floating: Boolean): List<Pair<BottomToggle, ActionHandleAnchor>> =
-    if (floating) {
-        listOf(
-            BottomToggle.TOOLBAR to ActionHandleAnchor.AFTER_DRAG_GRIP,
-            BottomToggle.FLOATING_KEYBOARD to ActionHandleAnchor.AFTER_TOOLBAR_TOGGLE,
-            BottomToggle.CANDIDATES_WINDOW to ActionHandleAnchor.AFTER_FLOATING_KEYBOARD_TOGGLE,
-        )
-    } else {
-        listOf(
-            BottomToggle.CANDIDATES_WINDOW to ActionHandleAnchor.SURFACE_START,
-            BottomToggle.FLOATING_KEYBOARD to ActionHandleAnchor.AFTER_CANDIDATES_WINDOW_TOGGLE,
-            BottomToggle.TOOLBAR to ActionHandleAnchor.SURFACE_END,
-        )
-    }
+internal fun actionHandleAnchors(floating: Boolean): List<Pair<BottomToggle, ActionHandleAnchor>> = if (floating) {
+    listOf(
+        BottomToggle.TOOLBAR to ActionHandleAnchor.AFTER_DRAG_GRIP,
+        BottomToggle.FLOATING_KEYBOARD to ActionHandleAnchor.AFTER_TOOLBAR_TOGGLE,
+        BottomToggle.CANDIDATES_WINDOW to ActionHandleAnchor.AFTER_FLOATING_KEYBOARD_TOGGLE,
+    )
+} else {
+    listOf(
+        BottomToggle.CANDIDATES_WINDOW to ActionHandleAnchor.SURFACE_START,
+        BottomToggle.FLOATING_KEYBOARD to ActionHandleAnchor.AFTER_CANDIDATES_WINDOW_TOGGLE,
+        BottomToggle.TOOLBAR to ActionHandleAnchor.SURFACE_END,
+    )
+}
 
 /** Margins of one bottom handle, in pixels. */
 internal data class HandleMargins(
@@ -271,12 +269,11 @@ internal data class HandleMargins(
  * Only a handle pinned to a corner carries the horizontal margin. A chained handle follows a
  * neighbour that already carries it, so giving it one too would double the gap.
  */
-internal fun handleMargins(anchor: ActionHandleAnchor, margin: Int): HandleMargins =
-    HandleMargins(
-        start = if (anchor == ActionHandleAnchor.SURFACE_START) margin else 0,
-        end = if (anchor == ActionHandleAnchor.SURFACE_END) margin else 0,
-        bottom = margin,
-    )
+internal fun handleMargins(anchor: ActionHandleAnchor, margin: Int): HandleMargins = HandleMargins(
+    start = if (anchor == ActionHandleAnchor.SURFACE_START) margin else 0,
+    end = if (anchor == ActionHandleAnchor.SURFACE_END) margin else 0,
+    bottom = margin,
+)
 
 /** Lets a floating keyboard move with two fingers even when keys fill its surface. */
 @SuppressLint("ViewConstructor", "ClickableViewAccessibility")
@@ -525,6 +522,7 @@ class InputView(
 
     var isFloatingKeyboardEnabled = keyboardPrefs.floatingKeyboard.getValue()
         private set
+
     /**
      * Percentage the surface would occupy with no extra scaling, i.e. the value the scale
      * factors are expressed against.
@@ -683,20 +681,18 @@ class InputView(
     }
 
     /** The share [minWidthPercent] of the reference width, floored by an absolute size. */
-    private fun minWidthPercent(): Int =
-        minWidthPercentFor(
-            minWidthDp = FLOATING_KEYBOARD_MIN_WIDTH_DP,
-            referenceWidthPx = referenceWidthPx(),
-            density = resources.displayMetrics.density,
-        ).coerceAtLeast(MIN_FLOATING_KEYBOARD_WIDTH_PERCENT)
+    private fun minWidthPercent(): Int = minWidthPercentFor(
+        minWidthDp = FLOATING_KEYBOARD_MIN_WIDTH_DP,
+        referenceWidthPx = referenceWidthPx(),
+        density = resources.displayMetrics.density,
+    ).coerceAtLeast(MIN_FLOATING_KEYBOARD_WIDTH_PERCENT)
 
     /** Converts the stored width share into the share the layout has to use. */
-    private fun layoutWidthPercent(widthPercent: Int): Int =
-        widthPercentForLayout(
-            widthPercent = widthPercent,
-            referenceWidthPx = referenceWidthPx(),
-            windowWidthPx = width,
-        )
+    private fun layoutWidthPercent(widthPercent: Int): Int = widthPercentForLayout(
+        widthPercent = widthPercent,
+        referenceWidthPx = referenceWidthPx(),
+        windowWidthPx = width,
+    )
 
     private fun handleFloatingResize(event: MotionEvent) {
         when (event.actionMasked) {

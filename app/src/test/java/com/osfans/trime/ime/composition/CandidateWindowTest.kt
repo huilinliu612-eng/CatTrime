@@ -22,9 +22,9 @@ class CandidateWindowTest :
             hasNextPage = hasNextPage,
             highlighted = highlighted,
             candidates =
-                Array(count) {
-                    CandidateProto(text = "c$it", comment = "", label = "${it + 1}")
-                },
+            Array(count) {
+                CandidateProto(text = "c$it", comment = "", label = "${it + 1}")
+            },
         )
 
         /** A measurer that records how often it was asked, so "never measured" can be asserted. */

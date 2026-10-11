@@ -147,13 +147,12 @@ object ColorManager {
         onChangeListeners.forEach { it.onColorChange(theme) }
     }
 
-    private fun colorScheme(id: String): ColorScheme? =
-        if (id == DynamicColorScheme.ID && DynamicColorScheme.isSupported) {
-            // 动态方案跟随系统深浅色，每次解析都按当前模式生成
-            DynamicColorScheme.create(isNightMode)
-        } else {
-            theme.colorSchemes.find { it.id == id }
-        }
+    private fun colorScheme(id: String): ColorScheme? = if (id == DynamicColorScheme.ID && DynamicColorScheme.isSupported) {
+        // 动态方案跟随系统深浅色，每次解析都按当前模式生成
+        DynamicColorScheme.create(isNightMode)
+    } else {
+        theme.colorSchemes.find { it.id == id }
+    }
 
     fun init(configuration: Configuration) {
         isNightMode = configuration.isNightMode()

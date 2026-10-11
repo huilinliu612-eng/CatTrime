@@ -25,15 +25,14 @@ fun String.matchesAny(regexSet: Set<Regex>): Boolean = regexSet.any { it.matches
 fun compileRegexSet(
     patterns: String,
     trim: Boolean = true,
-): Set<Regex> =
-    patterns
-        .split('\n')
-        .map { if (trim) it.trim() else it }
-        .filter { it.isNotEmpty() }
-        .mapNotNull { pattern ->
-            try {
-                Regex(pattern)
-            } catch (_: IllegalArgumentException) {
-                null
-            }
-        }.toSet()
+): Set<Regex> = patterns
+    .split('\n')
+    .map { if (trim) it.trim() else it }
+    .filter { it.isNotEmpty() }
+    .mapNotNull { pattern ->
+        try {
+            Regex(pattern)
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }.toSet()

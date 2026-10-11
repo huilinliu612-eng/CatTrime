@@ -22,9 +22,9 @@ class CandidateSlotsTest :
             hasNextPage = hasNextPage,
             highlighted = highlighted,
             candidates =
-                Array(count) {
-                    CandidateProto(text = "c$it", comment = "", label = "${it + 1}")
-                },
+            Array(count) {
+                CandidateProto(text = "c$it", comment = "", label = "${it + 1}")
+            },
         )
 
         Given("a highlighted candidate inside the first row") {

@@ -17,9 +17,9 @@ import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.FlexDirection
 import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayoutManager
-import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.core.CandidateProto
 import com.osfans.trime.core.Candidates
+import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.data.theme.Theme
 import splitties.dimensions.dp
 import splitties.views.dsl.core.Ui
@@ -87,14 +87,13 @@ class PagedCandidatesUi(
      */
     private val measureItem = LabeledCandidateItemUi(ctx, theme)
 
-    fun naturalWidths(candidates: List<CandidateProto>): List<Int> =
-        candidates.map { candidate ->
-            try {
-                measureItem.naturalWidth(candidate)
-            } catch (_: Exception) {
-                0
-            }
+    fun naturalWidths(candidates: List<CandidateProto>): List<Int> = candidates.map { candidate ->
+        try {
+            measureItem.naturalWidth(candidate)
+        } catch (_: Exception) {
+            0
         }
+    }
 
     sealed class UiHolder(
         open val ui: Ui,
@@ -252,8 +251,7 @@ class PagedCandidatesUi(
      * 0 means the geometry is not known yet, which the item reads as "do not squeeze" -- the safe
      * behaviour, and the one every candidates window had before an item could shrink at all.
      */
-    private fun itemMaxWidth(): Int =
-        if (isHorizontal) itemWidth.takeIf { it > 0 } ?: rowWidth else rowWidth
+    private fun itemMaxWidth(): Int = if (isHorizontal) itemWidth.takeIf { it > 0 } ?: rowWidth else rowWidth
 }
 
 /**

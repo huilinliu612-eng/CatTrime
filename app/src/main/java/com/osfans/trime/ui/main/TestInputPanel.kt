@@ -68,8 +68,7 @@ constructor(
     defStyleAttr: Int = 0,
 ) : LinearLayout(context, attrs, defStyleAttr) {
 
-    private fun themeColor(@AttrRes attribute: Int): Int =
-        MaterialColors.getColor(this, attribute)
+    private fun themeColor(@AttrRes attribute: Int): Int = MaterialColors.getColor(this, attribute)
 
     data class InputTypeOption(
         @StringRes val label: Int,

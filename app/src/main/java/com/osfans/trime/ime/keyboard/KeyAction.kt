@@ -142,14 +142,13 @@ class KeyAction(
         return adjustCase(displayLabel, keyboard)
     }
 
-    fun getText(keyboard: Keyboard): String =
-        if (text.isNotEmpty()) {
-            adjustCase(text, keyboard)
-        } else if (keyboard.isShifted && code in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z && modifier == 0) {
-            if (rime.status.isAsciiMode) "" else adjustCase(label, keyboard)
-        } else {
-            text
-        }
+    fun getText(keyboard: Keyboard): String = if (text.isNotEmpty()) {
+        adjustCase(text, keyboard)
+    } else if (keyboard.isShifted && code in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z && modifier == 0) {
+        if (rime.status.isAsciiMode) "" else adjustCase(label, keyboard)
+    } else {
+        text
+    }
 
     fun getPreview(keyboard: Keyboard): String = preview ?: getLabel(keyboard)
 

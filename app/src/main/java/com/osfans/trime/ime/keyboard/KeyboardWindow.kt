@@ -161,8 +161,7 @@ class KeyboardWindow :
         return width
     }
 
-    private fun selectKeyboardConfig(name: String): TextKeyboard? =
-        resolveKeyboardConfig(theme.presetKeyboards, name)
+    private fun selectKeyboardConfig(name: String): TextKeyboard? = resolveKeyboardConfig(theme.presetKeyboards, name)
 
     private fun attachKeyboard(target: String) {
         currentKeyboardId = target

@@ -138,8 +138,7 @@ class DynamicColorSchemeTest :
  * The palette with the system colours stubbed out as `FAMILY:tone`, so that the *assignment* can
  * be asserted without the Android resources behind the real ones.
  */
-private fun paletteOf(isNight: Boolean): Map<String, String> =
-    palette(isNight) { systemPalette, tone -> "${systemPalette.name}:$tone" }
+private fun paletteOf(isNight: Boolean): Map<String, String> = palette(isNight) { systemPalette, tone -> "${systemPalette.name}:$tone" }
 
 private val day = paletteOf(false)
 private val night = paletteOf(true)

@@ -25,7 +25,7 @@ class MainFragment : Fragment() {
     private val viewModel: MainViewModel by activityViewModels()
 
     private var _binding: FragmentMainBinding? = null
-    private val binding get() = checkNotNull(_binding)
+    val binding get() = checkNotNull(_binding)
 
     override fun onCreateView(
         inflater: LayoutInflater,

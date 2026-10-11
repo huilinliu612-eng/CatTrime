@@ -259,14 +259,13 @@ class CandidatesView(
     }
 
     /** This window's background: the theme's own decoration, faded by the opacity setting. */
-    private fun windowBackground(): Drawable? =
-        ColorManager.getDecorDrawable(
-            colorKey = "text_back_color",
-            borderColorKey = "candidate_border_color",
-            borderPx = dp(theme.window.border),
-            cornerRadius = dp(theme.window.cornerRadius),
-            alpha = backgroundAlpha * 255 / 100,
-        )
+    private fun windowBackground(): Drawable? = ColorManager.getDecorDrawable(
+        colorKey = "text_back_color",
+        borderColorKey = "candidate_border_color",
+        borderPx = dp(theme.window.border),
+        cornerRadius = dp(theme.window.cornerRadius),
+        alpha = backgroundAlpha * 255 / 100,
+    )
 
     private fun updatePosition() {
         if (visibility != VISIBLE) return
@@ -501,9 +500,8 @@ internal fun candidatesWindowTranslationY(
     selfHeight: Float,
     spacing: Float,
     minY: Float,
-): Float =
-    if (obstructionTop == null) {
-        positionedY
-    } else {
-        (obstructionTop - spacing - selfHeight).coerceAtLeast(minY)
-    }
+): Float = if (obstructionTop == null) {
+    positionedY
+} else {
+    (obstructionTop - spacing - selfHeight).coerceAtLeast(minY)
+}

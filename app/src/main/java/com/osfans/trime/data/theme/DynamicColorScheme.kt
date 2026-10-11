@@ -108,44 +108,41 @@ object DynamicColorScheme {
     )
 
     @ColorRes
-    private fun accent1Res(tone: Int): Int =
-        when (tone) {
-            TONE_0 -> android.R.color.system_accent1_0
-            TONE_100 -> android.R.color.system_accent1_100
-            TONE_200 -> android.R.color.system_accent1_200
-            TONE_300 -> android.R.color.system_accent1_300
-            TONE_600 -> android.R.color.system_accent1_600
-            TONE_700 -> android.R.color.system_accent1_700
-            TONE_900 -> android.R.color.system_accent1_900
-            else -> error("No accent1 tone $tone")
-        }
+    private fun accent1Res(tone: Int): Int = when (tone) {
+        TONE_0 -> android.R.color.system_accent1_0
+        TONE_100 -> android.R.color.system_accent1_100
+        TONE_200 -> android.R.color.system_accent1_200
+        TONE_300 -> android.R.color.system_accent1_300
+        TONE_600 -> android.R.color.system_accent1_600
+        TONE_700 -> android.R.color.system_accent1_700
+        TONE_900 -> android.R.color.system_accent1_900
+        else -> error("No accent1 tone $tone")
+    }
 
     @ColorRes
-    private fun accent2Res(tone: Int): Int =
-        when (tone) {
-            TONE_100 -> android.R.color.system_accent2_100
-            TONE_200 -> android.R.color.system_accent2_200
-            TONE_300 -> android.R.color.system_accent2_300
-            TONE_600 -> android.R.color.system_accent2_600
-            TONE_700 -> android.R.color.system_accent2_700
-            TONE_900 -> android.R.color.system_accent2_900
-            else -> error("No accent2 tone $tone")
-        }
+    private fun accent2Res(tone: Int): Int = when (tone) {
+        TONE_100 -> android.R.color.system_accent2_100
+        TONE_200 -> android.R.color.system_accent2_200
+        TONE_300 -> android.R.color.system_accent2_300
+        TONE_600 -> android.R.color.system_accent2_600
+        TONE_700 -> android.R.color.system_accent2_700
+        TONE_900 -> android.R.color.system_accent2_900
+        else -> error("No accent2 tone $tone")
+    }
 
     @ColorRes
-    private fun neutralRes(tone: Int): Int =
-        when (tone) {
-            TONE_10 -> android.R.color.system_neutral1_10
-            TONE_50 -> android.R.color.system_neutral1_50
-            TONE_100 -> android.R.color.system_neutral1_100
-            TONE_200 -> android.R.color.system_neutral1_200
-            TONE_300 -> android.R.color.system_neutral1_300
-            TONE_600 -> android.R.color.system_neutral1_600
-            TONE_700 -> android.R.color.system_neutral1_700
-            TONE_800 -> android.R.color.system_neutral1_800
-            TONE_900 -> android.R.color.system_neutral1_900
-            else -> error("No neutral1 tone $tone")
-        }
+    private fun neutralRes(tone: Int): Int = when (tone) {
+        TONE_10 -> android.R.color.system_neutral1_10
+        TONE_50 -> android.R.color.system_neutral1_50
+        TONE_100 -> android.R.color.system_neutral1_100
+        TONE_200 -> android.R.color.system_neutral1_200
+        TONE_300 -> android.R.color.system_neutral1_300
+        TONE_600 -> android.R.color.system_neutral1_600
+        TONE_700 -> android.R.color.system_neutral1_700
+        TONE_800 -> android.R.color.system_neutral1_800
+        TONE_900 -> android.R.color.system_neutral1_900
+        else -> error("No neutral1 tone $tone")
+    }
 
     private fun argb(
         @ColorRes id: Int,

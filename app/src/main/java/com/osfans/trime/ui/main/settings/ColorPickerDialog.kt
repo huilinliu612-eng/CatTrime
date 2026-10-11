@@ -54,10 +54,9 @@ object ColorPickerDialog {
      * translated one. Presets fall back to their id when a theme leaves `name` out, instead of
      * rendering an empty row.
      */
-    private fun ColorScheme.displayName(context: Context): String =
-        if (id == DynamicColorScheme.ID) {
-            context.getString(R.string.dynamic_color_scheme)
-        } else {
-            colors["name"] ?: id
-        }
+    private fun ColorScheme.displayName(context: Context): String = if (id == DynamicColorScheme.ID) {
+        context.getString(R.string.dynamic_color_scheme)
+    } else {
+        colors["name"] ?: id
+    }
 }

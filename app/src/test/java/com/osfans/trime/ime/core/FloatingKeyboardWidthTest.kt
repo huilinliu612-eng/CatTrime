@@ -23,8 +23,7 @@ class FloatingKeyboardWidthTest :
         val shortSide = portraitWindow
         val density = 3.25f
 
-        fun physicalWidth(percent: Int, windowWidth: Int): Int =
-            widthPercentForLayout(percent, shortSide, windowWidth) * windowWidth / 100
+        fun physicalWidth(percent: Int, windowWidth: Int): Int = widthPercentForLayout(percent, shortSide, windowWidth) * windowWidth / 100
 
         Given("a width chosen while the phone is held upright") {
             Then("the keyboard keeps that physical width after a rotation") {
@@ -39,8 +38,10 @@ class FloatingKeyboardWidthTest :
 
             Then("the share shrinks as the window widens, since the pixels are fixed") {
                 // Same pixels, smaller share of a bigger window.
-                (widthPercentForLayout(86, shortSide, landscapeWindow) <
-                    widthPercentForLayout(86, shortSide, portraitWindow)) shouldBe true
+                (
+                    widthPercentForLayout(86, shortSide, landscapeWindow) <
+                        widthPercentForLayout(86, shortSide, portraitWindow)
+                    ) shouldBe true
             }
         }
 
@@ -90,8 +91,10 @@ class FloatingKeyboardWidthTest :
             Then("the drag handle never goes below it") {
                 // Otherwise a width reached by dragging would be shown as something else in
                 // settings, and the two would disagree about what the keyboard's size is.
-                (minWidthPercentFor(FLOATING_KEYBOARD_MIN_WIDTH_DP, shortSide, density) >=
-                    MIN_FLOATING_KEYBOARD_WIDTH_PERCENT) shouldBe true
+                (
+                    minWidthPercentFor(FLOATING_KEYBOARD_MIN_WIDTH_DP, shortSide, density) >=
+                        MIN_FLOATING_KEYBOARD_WIDTH_PERCENT
+                    ) shouldBe true
             }
         }
 

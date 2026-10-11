@@ -27,24 +27,22 @@ import splitties.views.dsl.core.view
 @Suppress("FunctionName")
 fun Context.ProgressBarDialogIndeterminate(
     @StringRes title: Int,
-): AlertDialog.Builder {
-    return MaterialAlertDialogBuilder(this)
-        .setTitle(title)
-        .setView(
-            verticalLayout {
-                add(
-                    view(::LinearProgressIndicator) {
-                        isIndeterminate = true
-                    },
-                    lParams {
-                        width = matchParent
-                        verticalMargin = dp(20)
-                        horizontalMargin = dp(26)
-                    },
-                )
-            },
-        ).setCancelable(false)
-}
+): AlertDialog.Builder = MaterialAlertDialogBuilder(this)
+    .setTitle(title)
+    .setView(
+        verticalLayout {
+            add(
+                view(::LinearProgressIndicator) {
+                    isIndeterminate = true
+                },
+                lParams {
+                    width = matchParent
+                    verticalMargin = dp(20)
+                    horizontalMargin = dp(26)
+                },
+            )
+        },
+    ).setCancelable(false)
 
 fun LifecycleCoroutineScope.withLoadingDialog(
     context: Context,
