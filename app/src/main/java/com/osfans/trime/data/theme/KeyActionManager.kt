@@ -5,6 +5,7 @@
 package com.osfans.trime.data.theme
 
 import com.osfans.trime.data.theme.model.KeyActionToken
+import com.osfans.trime.data.theme.model.PresetKey
 import com.osfans.trime.ime.keyboard.KeyAction
 
 object KeyActionManager {

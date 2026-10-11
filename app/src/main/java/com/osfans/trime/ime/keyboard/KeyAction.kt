@@ -7,13 +7,18 @@ package com.osfans.trime.ime.keyboard
 import android.view.KeyEvent
 import com.osfans.trime.daemon.RimeDaemon
 import com.osfans.trime.data.prefs.AppPrefs
+import com.osfans.trime.data.prefs.LazyPreferenceDelegate
 import com.osfans.trime.data.theme.ThemeManager
 import com.osfans.trime.data.theme.model.KeyActionToken
+import com.osfans.trime.data.theme.model.PresetKey
 import com.osfans.trime.util.virtualKeyCharacterMap
 
 /** [按鍵][Key]的各種事件（單擊、長按、滑動等）  */
 class KeyAction(
     token: KeyActionToken,
+    // Synthetic preset keys for commands built in code (see [KeyActionManager.getCommandAction]);
+    // when absent, the active theme's own preset_keys are consulted.
+    private val presetKeys: Map<String, PresetKey>? = null,
 ) {
     constructor(token: String) : this(KeyActionToken.Plain(token))
 
@@ -66,7 +71,8 @@ class KeyAction(
     val modifierKeyOnMask: Int
         get() = getModifierKeyOnMask(this.code)
 
-    private var text: String = ""
+    var text: String = ""
+        private set
     private var label: String = ""
     private var shiftLabel = ""
     private var preview: String? = null
@@ -181,7 +187,7 @@ class KeyAction(
             is KeyActionToken.Plain -> {
                 val label: String
                 // match like: { x: BackSpace } -> preset_keys/BackSpace: {..., send: BackSpace }
-                val preset = ThemeManager.activeTheme.presetKeys[token.token]
+                val preset = presetKeys?.get(token.token) ?: ThemeManager.activeTheme.presetKeys[token.token]
                 if (preset != null) {
                     command = preset.command
                     option = preset.option

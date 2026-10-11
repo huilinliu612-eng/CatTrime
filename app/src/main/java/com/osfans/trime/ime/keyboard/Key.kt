@@ -74,8 +74,8 @@ class Key(
     var keyPressOffsetX = 0f
     var keyPressOffsetY = 0f
 
-    /** The built-in dynamic scheme is the active one. Cached per colour-scheme generation. */
-    private val dynamicPalette: Boolean by schemeColor { ColorManager.isDynamicSchemeActive }
+    /** The built-in dynamic scheme is the active one. Rebuilt together with the keyboard on scheme change. */
+    private val dynamicPalette: Boolean by lazy { ColorManager.isDynamicSchemeActive }
 
     /**
      * Whether a colour the theme binds to this one key still applies.

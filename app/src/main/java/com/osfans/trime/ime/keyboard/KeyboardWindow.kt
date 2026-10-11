@@ -191,7 +191,6 @@ class KeyboardWindow :
                 }
             }
 
-            currentKeyboard = it
             // TODO：为避免过量重构，这里暂时将 currentKeyboard 同步到 KeyboardSwitcher
             KeyboardSwitcher.currentKeyboard = it
             // Keys draw their toggle state from a cache, so seed it once here

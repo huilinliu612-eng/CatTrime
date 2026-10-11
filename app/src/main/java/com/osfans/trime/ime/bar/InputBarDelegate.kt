@@ -336,8 +336,8 @@ class InputBarDelegate : InputBroadcastReceiver {
         return ColorManager.getDecorDrawable(
             "candidate_background",
             "candidate_border_color",
-            dp(theme.generalStyle.candidateBorder),
-            dp(theme.generalStyle.candidateBorderRound),
+            context.dp(theme.generalStyle.candidateBorder),
+            context.dp(theme.generalStyle.candidateBorderRound),
         )
     }
 

@@ -43,6 +43,7 @@ import com.osfans.trime.ime.broadcast.InputBroadcaster
 import com.osfans.trime.ime.candidates.popup.PopupCandidatesMode
 import com.osfans.trime.ime.composition.PreeditDelegate
 import com.osfans.trime.ime.dependency.InputDependencyManager
+import com.osfans.trime.ime.keyboard.CommonKeyboardActionListener
 import com.osfans.trime.ime.keyboard.KeyboardPrefs.isLandscapeMode
 import com.osfans.trime.ime.keyboard.KeyboardWindow
 import com.osfans.trime.ime.popup.PopupDelegate
