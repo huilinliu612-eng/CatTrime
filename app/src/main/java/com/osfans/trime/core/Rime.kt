@@ -218,7 +218,12 @@ class Rime :
             fullCheck: $fullCheck
             """.trimIndent(),
         )
-        startupRime(sharedDataDir, userDataDir, BuildConfig.BUILD_VERSION_NAME, fullCheck)
+        startupRime(
+            sharedDataDir,
+            userDataDir,
+            BuildConfig.BUILD_VERSION_NAME,
+            fullCheck,
+        )
     }
 
     private fun processKeyInner(value: Int, modifiers: Int, isVirtual: Boolean): Boolean {

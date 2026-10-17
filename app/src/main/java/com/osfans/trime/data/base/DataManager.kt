@@ -7,9 +7,9 @@ package com.osfans.trime.data.base
 import android.content.res.AssetManager
 import android.os.Build
 import android.os.Environment
+import com.osfans.trime.TrimeApplication
 import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.util.FileUtils
-import com.osfans.trime.util.ResourceUtils
 import com.osfans.trime.util.appContext
 import kotlinx.serialization.json.Json
 import timber.log.Timber
@@ -35,6 +35,8 @@ object DataManager {
 
     private fun deserializeDataChecksums(raw: String): DataChecksums = json.decodeFromString<DataChecksums>(raw)
 
+    private fun serializeDataChecksums(checksums: DataChecksums): String = json.encodeToString(checksums)
+
     // If Android version supports direct boot, we put the hierarchy in device encrypted storage
     // instead of credential encrypted storage so that data can be accessed before user unlock
     private val dataDir: File =
@@ -52,12 +54,20 @@ object DataManager {
 
     private val prefs by lazy { AppPrefs.defaultInstance() }
 
+    private val externalFilesDir get() = TrimeApplication.getInstance().externalFilesDir
+
     val defaultDataDir = File(Environment.getExternalStorageDirectory(), "rime")
 
-    val sharedDataDir = File(appContext.getExternalFilesDir(null), "shared").also { it.mkdirs() }
+    val sharedDataDir = File(externalFilesDir, "shared").also { it.mkdirs() }
 
     val userDataDir
-        get() = File(prefs.profile.userDataDir.getValue()).also { it.mkdirs() }
+        get() = if (TrimeApplication.getInstance().isDirectBootMode) {
+            // the user-configured dir lives on credential encrypted storage,
+            // which is not accessible until the user is unlocked
+            File(externalFilesDir, "rime")
+        } else {
+            File(prefs.profile.userDataDir.getValue())
+        }.also { it.mkdirs() }
 
     val prebuiltDataDir = File(sharedDataDir, "build")
     val stagingDir get() = File(userDataDir, "build")
@@ -80,9 +90,9 @@ object DataManager {
     }
 
     fun sync() = lock.withLock {
-        val oldChecksumsFile = File(dataDir, DATA_CHECKSUMS_NAME)
+        val destChecksumsFile = File(dataDir, DATA_CHECKSUMS_NAME)
         val oldChecksums =
-            oldChecksumsFile
+            destChecksumsFile
                 .runCatching { deserializeDataChecksums(bufferedReader().use { it.readText() }) }
                 .getOrElse { DataChecksums("", emptyMap()) }
 
@@ -93,17 +103,16 @@ object DataManager {
             when (it) {
                 is DataDiff.CreateFile,
                 is DataDiff.UpdateFile,
-                -> {
-                    val destPath = sharedDataDir.resolveSibling(it.path).absolutePath
-                    ResourceUtils.copyFile(it.path, destPath)
-                }
+                -> appContext.assets.copyFile(it.path)
                 is DataDiff.DeleteDir,
                 is DataDiff.DeleteFile,
-                -> FileUtils.delete(sharedDataDir.resolve(it.path.substringAfterLast('/'))).getOrThrow()
+                -> removePath(it.path).getOrThrow()
             }
         }
 
-        ResourceUtils.copyFile(DATA_CHECKSUMS_NAME, dataDir.resolve(DATA_CHECKSUMS_NAME).absolutePath)
+        destChecksumsFile.bufferedWriter().use {
+            it.write(serializeDataChecksums(newChecksums))
+        }
 
         val custom = userDataDir.resolve(DEFAULT_CUSTOM_FILE_NAME)
         if (!custom.exists()) {
@@ -114,4 +123,15 @@ object DataManager {
 
         Timber.d("Synced!")
     }
+
+    private fun AssetManager.copyFile(filename: String) {
+        open(filename).use { i ->
+            File(externalFilesDir, filename)
+                .also { it.parentFile?.mkdirs() }
+                .outputStream()
+                .use { o -> i.copyTo(o) }
+        }
+    }
+
+    private fun removePath(path: String) = FileUtils.delete(externalFilesDir.resolve(path))
 }

@@ -5,6 +5,7 @@
 
 package com.osfans.trime.ui.main.settings.theme
 
+import android.os.Build
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
@@ -28,5 +29,12 @@ class ThemeSettingsFragment : PreferenceDelegateFragment(ThemeManager.prefs) {
             lifecycleScope.launch { ColorPickerDialog.build(lifecycleScope, requireContext()).show() }
             true
         }
+    }
+
+    override fun onStop() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            ThemeManager.syncToDeviceEncryptedStorage()
+        }
+        super.onStop()
     }
 }

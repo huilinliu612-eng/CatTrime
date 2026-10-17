@@ -6,11 +6,16 @@
 package com.osfans.trime.data.theme
 
 import android.content.res.Configuration
+import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.core.content.edit
+import androidx.preference.PreferenceManager
 import com.osfans.trime.core.Rime
 import com.osfans.trime.data.base.DataManager
 import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.ime.symbol.LiquidData
 import com.osfans.trime.util.WeakHashSet
+import com.osfans.trime.util.appContext
 import com.osfans.trime.util.yaml.Yaml
 import com.osfans.trime.util.yaml.mapping
 import timber.log.Timber
@@ -139,5 +144,16 @@ object ThemeManager {
         LiquidData.init(theme)
         activeTheme = theme
         prefs.selectedTheme.setValue(resolvedTheme.configId)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun syncToDeviceEncryptedStorage() {
+        val ctx = appContext.createDeviceProtectedStorageContext()
+        val sp = PreferenceManager.getDefaultSharedPreferences(ctx)
+        sp.edit {
+            prefs.preferenceDelegates.forEach {
+                it.value.putValueTo(this@edit)
+            }
+        }
     }
 }

@@ -23,11 +23,11 @@ import com.osfans.trime.util.readText
 import com.osfans.trime.util.subprocess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import splitties.systemservices.notificationManager
+import timber.log.Timber
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -88,6 +88,7 @@ object RimeDaemon {
             return@withLock sessions.getValue(name)
         }
         if (realRime.lifecycle.currentState == RimeLifecycle.State.STOPPED) {
+            Timber.d("RimeDaemon start rime")
             realRime.startup()
         }
         val session = establish(name)
@@ -101,6 +102,7 @@ object RimeDaemon {
         }
         sessions -= name
         if (sessions.isEmpty()) {
+            Timber.d("RimeDaemon stop rime")
             realRime.finalize()
         }
     }
@@ -160,6 +162,10 @@ object RimeDaemon {
                 notificationManager.cancel(id)
             }
         }
+    }
+
+    fun stopRime() {
+        realRime.finalize()
     }
 
     private suspend fun handleRimeMessage(it: RimeMessage<*>) {
