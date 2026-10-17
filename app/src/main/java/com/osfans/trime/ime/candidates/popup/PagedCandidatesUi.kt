@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+import androidx.core.view.doOnLayout
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import com.chad.library.adapter4.BaseQuickAdapter
@@ -38,62 +39,30 @@ class PagedCandidatesUi(
     private var isHorizontal = true
 
     /**
-     * Fixed width given to every candidate, or 0 to let each one keep its natural width.
-     *
-     * The row is a single line, so its candidates cannot be allowed to size themselves freely: a
-     * page that does not fit would wrap onto a second line. The owner computes one width from the
-     * candidates' natural widths instead -- wide enough for the widest one it keeps, so nothing is
-     * ellipsized. A layout that stacks the candidates ignores this: those span the window's width.
+     * 纵向倒序（[PopupCandidatesLayout.VERTICAL_REVERSE]）用数据倒序实现，而不是
+     * FlexDirection.COLUMN_REVERSE：flexbox 库的反向布局在 RecyclerView wrap_content
+     * 测量下内容高度会算错（叠加条目 margin 后必然复现），条目被布局到可见区之外
+     * （占位不显示、点击错位）。数据倒序让布局管理器走与正序完全相同的 COLUMN 路径。
      */
-    private var itemWidth = 0
+    private var isReversed = false
 
     /** Read per bind rather than captured with `by`, which would freeze the value at construction
      * and leave the setting looking like it did nothing. */
     private val itemSpacingPref = AppPrefs.defaultInstance().candidates.itemSpacing
 
+    /** 同上：行数上限每次绑定时读取，设置页改动后无需重建窗口即生效。 */
+    private val rowLimitPref = AppPrefs.defaultInstance().candidates.candidateRowLimit
+
     /**
-     * Width the row itself may occupy, as the window measured it.
+     * Width the window's candidate area may occupy, as the window measured it.
      *
-     * Only an item that spans the row needs it (a candidate layout that stacks them); an item of a
-     * fixed width is handed its own number instead. Kept because the row cannot work it out from
-     * its own bounds: those are only settled after it has been laid out, by which time the items
-     * have already been bound and drawn.
+     * An item stacks only as wide as the window in a vertical layout; a horizontal item keeps its
+     * natural width and wraps to the next flex line when the row is full. Either way this is the
+     * upper bound used when the item has to shrink a candidate that is wider than the window.
+     * Kept because the row cannot work it out from its own bounds: those are only settled after
+     * it has been laid out, by which time the items have already been bound and drawn.
      */
     private var rowWidth = 0
-
-    /**
-     * Total horizontal room the gaps between [count] candidates take, in pixels.
-     *
-     * The owner has to subtract this from the usable width before deciding how wide each candidate
-     * may be. Every candidate carries the gap on **both** sides, and the outermost ones do too --
-     * the row is a flex line, so the leading and trailing margins are part of its width just like
-     * the ones in between. Overlooking that makes the row overflow and wrap onto a second line,
-     * which is the one thing the single-row window must never do.
-     */
-    fun spacingFor(count: Int): Int = if (count <= 0) 0 else count * 2 * ctx.dp(itemSpacingPref.getValue())
-
-    /**
-     * Measures how wide each of [candidates] would be if nothing were compressed.
-     *
-     * The row has to be a single line, and the "max candidates per line" setting is a maximum
-     * rather than a target, so the owner needs the natural widths to pick a width that shows
-     * every candidate in full (see `balancedItemWidth`). It measures the *slice* the caller is
-     * about to show, not the currently bound list, so it can be asked before the window is cut.
-     *
-     * A width is only ever an optimisation here, so a failed measurement degrades to 0 ("size
-     * this candidate itself") instead of propagating. This runs on the per-keystroke path of an
-     * input method, where an exception kills the whole IME process and leaves the user with no
-     * keyboard at all -- never worth a nicer row.
-     */
-    private val measureItem = LabeledCandidateItemUi(ctx, theme)
-
-    fun naturalWidths(candidates: List<CandidateProto>): List<Int> = candidates.map { candidate ->
-        try {
-            measureItem.naturalWidth(candidate)
-        } catch (_: Exception) {
-            0
-        }
-    }
 
     sealed class UiHolder(
         open val ui: Ui,
@@ -151,20 +120,61 @@ class PagedCandidatesUi(
                 when (holder) {
                     is UiHolder.Candidate -> {
                         val candidate = item ?: return
+                        // 倒序是纯显示层的列表反转，回调必须映射回 Rime 的候选下标
+                        val candidateIndex =
+                            if (isReversed) items.size - 1 - position else position
                         holder.ui.root.setOnClickListener {
-                            onCandidateClick.invoke(position)
+                            onCandidateClick.invoke(candidateIndex)
                         }
                         holder.ui.root.setOnLongClickListener { v ->
-                            onCandidateAction.invoke(position, candidate.text, v)
+                            onCandidateAction.invoke(candidateIndex, candidate.text, v)
                             true
                         }
-                        holder.ui.update(candidate, position == candidates.highlighted, itemMaxWidth())
-                        holder.ui.root.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {
-                            width = when {
-                                !isHorizontal -> MATCH_PARENT
-                                itemWidth > 0 -> itemWidth
-                                else -> WRAP_CONTENT
+                        // 行数上限逐条应用：横向行放不下时由 flex 换行，绝不裁剪整页。
+                        val rowLimit = rowLimitPref.getValue()
+                        val scale =
+                            holder.ui.update(
+                                candidate,
+                                candidateIndex == candidates.highlighted,
+                                rowWidth,
+                                rowLimit,
+                            )
+                        // 截断来源有二：缩放小于 1（单行整单元缩小后仍溢出）、注解被
+                        // 手工截断到剩余宽度（缩放恒为 1，见 bindSingleLine）——任一
+                        // 发生都记录到当前页的截断集合，长按菜单据此决定是否提供
+                        // 「完整显示」；每页重建集合，不做跨页累积，也无需额外测量。
+                        if (scale < 1f || holder.ui.lastBindTruncated) {
+                            truncatedTexts.add(candidate.text)
+                        } else {
+                            truncatedTexts.remove(candidate.text)
+                        }
+                        // 多行模式（行数上限 ≥ 2 或不限）下 scale 恒为 1，上面的缩放检测
+                        // 失明：布局完成后按各行 ellipsisCount 判定注解是否被截断。单行
+                        // 条目仍以缩放结果为准（缩后放得下的并不出省略号）。
+                        if (holder.ui.root.maxLines != 1) {
+                            val itemRoot = holder.ui.root
+                            itemRoot.doOnLayout {
+                                val layout = itemRoot.layout ?: return@doOnLayout
+                                var ellipsized = false
+                                for (line in 0 until layout.lineCount) {
+                                    if (layout.getEllipsisCount(line) > 0) {
+                                        ellipsized = true
+                                        break
+                                    }
+                                }
+                                if (ellipsized) {
+                                    truncatedTexts.add(candidate.text)
+                                } else {
+                                    truncatedTexts.remove(candidate.text)
+                                }
                             }
+                        }
+                        // 完整显示：长按选中的候选按不限行展开注解，其余按行数上限
+                        // 排布；横向行里展开项独占若干行，其余候选照常换行。文本做
+                        // key（同页内定位展开项），展开态随每次更新重置（见 [update]）。
+                        holder.ui.setExpanded(candidate.text == fullDisplayText)
+                        holder.ui.root.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {
+                            width = if (isHorizontal) WRAP_CONTENT else MATCH_PARENT
                             // Without a gap the fills of two neighbouring candidates touch and the
                             // row reads as a single block, so the items stop looking individually
                             // selectable. The gap follows the axis the candidates run along: a
@@ -180,6 +190,7 @@ class PagedCandidatesUi(
                     }
                     is UiHolder.Pagination -> {
                         holder.ui.update(candidates)
+                        holder.ui.setLayoutMode(isHorizontal)
                         holder.ui.root.updateLayoutParams<FlexboxLayoutManager.LayoutParams> {
                             flexGrow = 1f
                             width = if (isHorizontal) WRAP_CONTENT else MATCH_PARENT
@@ -211,19 +222,31 @@ class PagedCandidatesUi(
     ) {
         val wasHorizontal = isHorizontal
         this.candidates = candidates
+        // 翻页/换页即重建截断集合：截断与否是“当前页”的属性，跨页累积既无意义
+        // 又会让菜单项在切页后误显示。
+        truncatedTexts.clear()
+        // 完整显示不跨页/跨输入记忆：新候选一到就收起。展开态以文本为 key，
+        // 不清空的话下次输入命中相同文本仍会残留展开（展开状态残留问题）。
+        fullDisplayText = null
         this.isHorizontal = resolvedHorizontalLayout(candidates, layout)
+        this.isReversed = layout == PopupCandidatesLayout.VERTICAL_REVERSE
         this.rowWidth = rowWidth
         candidatesLayoutManager.apply {
             flexDirection = when (layout) {
                 PopupCandidatesLayout.HORIZONTAL -> FlexDirection.ROW
-                PopupCandidatesLayout.VERTICAL_REVERSE -> FlexDirection.COLUMN_REVERSE
+                // 反向布局改由数据倒序承载（见 isReversed），COLUMN_REVERSE 的测量
+                // 在 wrap_content + margin 下不可靠。
+                PopupCandidatesLayout.VERTICAL_REVERSE -> FlexDirection.COLUMN
                 PopupCandidatesLayout.AUTOMATIC ->
                     if (isHorizontal) FlexDirection.ROW else FlexDirection.COLUMN
                 else -> FlexDirection.COLUMN
             }
             alignItems = if (isHorizontal) AlignItems.BASELINE else AlignItems.STRETCH
         }
-        candidatesAdapter.submitList(candidates.candidates.toList())
+        val displayList = candidates.candidates.toList()
+        candidatesAdapter.submitList(
+            if (isReversed) displayList.asReversed() else displayList,
+        )
         // The gaps follow the axis, so a flip has to re-bind even when the page is unchanged.
         // submitList only dispatches when the contents differ, and Rime reports the same page
         // for both layouts, so without this the row would keep the previous orientation's margins.
@@ -237,21 +260,32 @@ class PagedCandidatesUi(
         candidatesAdapter.notifyDataSetChanged()
     }
 
-    /** Re-lays the row out with a new width per candidate; no-op when it did not change. */
-    fun setItemWidth(width: Int) {
-        if (itemWidth == width) return
-        itemWidth = width
-        candidatesAdapter.notifyDataSetChanged()
-    }
+    /** 当前完整展开注解的候选文本；null=无。以文本为 key 在本页内命中，随
+     * [update]（翻页/新输入）重置，不跨页/跨输入记忆。 */
+    private var fullDisplayText: String? = null
+
+    /** 当前页注解被截断的候选文本集合（单行缩放后仍出省略号、或多行超出上限
+     * 出省略号），随每次翻页/更新重建。 */
+    private val truncatedTexts = mutableSetOf<String>()
 
     /**
-     * Width an item may draw into: the one the row hands it (see [setItemWidth]), or the whole row
-     * when the item spans it.
-     *
-     * 0 means the geometry is not known yet, which the item reads as "do not squeeze" -- the safe
-     * behaviour, and the one every candidates window had before an item could shrink at all.
+     * 长按菜单是否提供「完整显示」：仅当该候选注解在当前页确实被截断、且尚未展开
+     * 时才显示（未截断没有可展开内容，已展开无需再展开——菜单项随之隐藏）。
+     * 判断复用绑定时的缩放结果（见 onBindViewHolder），无需额外测量。横向与纵向
+     * 同样适用：行数上限逐条生效，被截断的候选都可能需要完整显示。
      */
-    private fun itemMaxWidth(): Int = if (isHorizontal) itemWidth.takeIf { it > 0 } ?: rowWidth else rowWidth
+    fun canToggleFullDisplay(text: String): Boolean = text != fullDisplayText && text in truncatedTexts
+
+    /**
+     * 长按菜单的「完整显示」：把该候选注解多行展开。同时在窗口里只允许一个，
+     * 对其他候选触发则顶替（用户规则）。展开后菜单项随之隐藏（见
+     * [canToggleFullDisplay]），收起靠顶替、翻页或下一次输入自然重置。
+     * 横向行里展开项独占若干行，其余候选照常换行。
+     */
+    fun toggleFullDisplay(text: String) {
+        fullDisplayText = if (fullDisplayText == text) null else text
+        candidatesAdapter.notifyDataSetChanged()
+    }
 }
 
 /**

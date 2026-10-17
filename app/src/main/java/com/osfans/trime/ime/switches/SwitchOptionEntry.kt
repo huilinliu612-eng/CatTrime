@@ -66,8 +66,11 @@ sealed class SwitchOptionEntry(
                 val options = it.options
                 if (options.size != labels.size) return null
                 val index = options.indexOfFirst(isOptionOn)
-                val label = labels[if (index >= 0) index else 0]
-                Custom(it, label, 0, index)
+                // 全部 option 都未开（比如新会话还没人设置过）时，rime 的默认态就是第
+                // 一个 option；label 与勾选必须回落到同一个状态，否则标签显示状态 0、
+                // 勾选却一个都不亮。
+                val selectedIndex = if (index >= 0) index else 0
+                Custom(it, labels[selectedIndex], 0, selectedIndex)
             }
         }
     }

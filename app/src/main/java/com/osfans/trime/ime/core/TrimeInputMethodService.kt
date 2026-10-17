@@ -100,15 +100,22 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
 
     private val recreateInputViewPrefs: Array<PreferenceDelegate<*>> = arrayOf(
         prefs.keyboard.floatingKeyboard,
+        // 横屏自动悬浮开关在 InputView 构造期参与「有效悬浮」判定，切换后必须
+        // 重建输入视图才能生效（走监听器的 else 分支整体重建）。
+        prefs.keyboard.floatingKeyboardAutoLandscape,
         prefs.keyboard.floatingKeyboardWidth,
         prefs.keyboard.floatingKeyboardHeight,
+        prefs.keyboard.floatingKeyboardKeepRatio,
+        // 拖动条位置（顶部/底部）在 InputView 构建时读取并决定标题栏摆放，
+        // 切换后必须整体重建输入视图才能实时生效。
+        prefs.keyboard.floatingKeyboardBarPosition,
+        prefs.keyboard.floatingKeyboardCornerRadius,
         prefs.keyboard.floatingPreeditOffsetX,
         prefs.keyboard.floatingPreeditOffsetY,
         prefs.keyboard.expandKeypressArea,
         prefs.keyboard.hideKeySymbol,
         prefs.keyboard.hideKeyHint,
         prefs.keyboard.hideInputBar,
-        prefs.keyboard.bottomToggleMargin,
         prefs.advanced.ignoreSystemGestureInsets,
     )
 
@@ -117,11 +124,9 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         PreferenceDelegate.OnChangeListener<Any> { key, _ ->
             if (updatingFloatingKeyboardSize) return@OnChangeListener
             when (key) {
-                AppPrefs.Keyboard.FLOATING_KEYBOARD -> {
-                    val enabled = prefs.keyboard.floatingKeyboard.getValue()
-                    inputView?.setFloatingKeyboardEnabled(enabled)
-                        ?: replaceInputView(ThemeManager.activeTheme)
-                }
+                // 悬浮键盘开关直接整体重建输入视图：状态一律从偏好重新派生，
+                // 避免原位迁移留下的半应用状态（曾导致开关有时无法关闭）。
+                AppPrefs.Keyboard.FLOATING_KEYBOARD -> replaceInputView(ThemeManager.activeTheme)
 
                 AppPrefs.Keyboard.HIDE_INPUT_BAR -> {
                     if (inputView != null) {
@@ -131,12 +136,53 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
                     }
                 }
 
-                // Only the margins of the bottom row move, so no rebuild is needed.
-                AppPrefs.Keyboard.BOTTOM_TOGGLE_MARGIN -> inputView?.refreshBottomHandleMargin()
+                AppPrefs.Keyboard.FLOATING_KEYBOARD_WIDTH,
+                AppPrefs.Keyboard.FLOATING_KEYBOARD_HEIGHT,
+                -> {
+                    syncKeepRatioDimension(key)
+                    replaceInputView(ThemeManager.activeTheme)
+                }
+
+                // 等比开关切换：开启时先把高度对齐到宽度档位（等比以宽度档位为准），
+                // 再重建输入视图让 applyFloatingScale 立即按新开关重算缩放，实时生效。
+                AppPrefs.Keyboard.FLOATING_KEYBOARD_KEEP_RATIO -> {
+                    syncKeepRatioDimension(AppPrefs.Keyboard.FLOATING_KEYBOARD_WIDTH)
+                    replaceInputView(ThemeManager.activeTheme)
+                }
 
                 else -> replaceInputView(ThemeManager.activeTheme)
             }
         }
+
+    /** Guard against the linked-dimension write-back re-entering [syncKeepRatioDimension]. */
+    private var updatingKeepRatioDimension = false
+
+    /**
+     * 等比缩放开启时宽高是同一个值：任意拖动其中一个滑条，另一个立即同步为相同数字
+     * （宽高滑条范围已统一为 40-100，联动值天然落在双方都可表达的区间内）；
+     * 关闭等比时宽高各自独立。
+     */
+    private fun syncKeepRatioDimension(changedKey: String) {
+        if (updatingKeepRatioDimension) return
+        if (!prefs.keyboard.floatingKeyboardKeepRatio.getValue()) return
+        val widthPref = prefs.keyboard.floatingKeyboardWidth
+        val heightPref = prefs.keyboard.floatingKeyboardHeight
+        updatingKeepRatioDimension = true
+        try {
+            when (changedKey) {
+                AppPrefs.Keyboard.FLOATING_KEYBOARD_WIDTH -> {
+                    val height = widthPref.getValue()
+                    if (heightPref.getValue() != height) heightPref.setValue(height)
+                }
+                AppPrefs.Keyboard.FLOATING_KEYBOARD_HEIGHT -> {
+                    val width = heightPref.getValue()
+                    if (widthPref.getValue() != width) widthPref.setValue(width)
+                }
+            }
+        } finally {
+            updatingKeepRatioDimension = false
+        }
+    }
 
     private var updatingFloatingKeyboardSize = false
 
@@ -160,9 +206,9 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     private val recreateCandidatesViewListener =
         PreferenceDelegateProvider.OnChangeListener { key ->
             replaceCandidateView(ThemeManager.activeTheme)
-            // The bottom toggle mirrors the mode, so it has to follow a change made in Settings.
             if (key == AppPrefs.Candidates.MODE) {
-                inputView?.refreshCandidatesWindowToggle()
+                // 候选栏与候选窗口切换时清理当前输入，避免残留的候选/预编辑引发意外行为
+                postRimeJob { clearComposition() }
             }
         }
 
@@ -488,14 +534,40 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     private val decorLocationInt = intArrayOf(0, 0)
     private var decorLocationUpdated = false
 
-    private fun updateDecorLocation() {
+    /**
+     * Re-derives the area the candidate window is placed against from the live hierarchy.
+     *
+     * Docked, that area ends at the top of the keyboard; floating, it is the whole content view
+     * because the floating layer overlays the editor and the window is instead kept above the
+     * keys by its obstruction. Both change after the window was last shown -- a taller keyboard,
+     * a floating keyboard that moved -- so neither may be captured only once.
+     */
+    private fun updateCandidatesParentSize() {
+        val iv = inputView
         contentSize[0] = contentView.width.toFloat()
         contentSize[1] =
-            if (inputDeviceManager.useVirtualKeyboard) {
-                inputViewLocation[1].toFloat()
-            } else {
+            if (iv == null || iv.isFloatingKeyboardEnabled || !inputDeviceManager.useVirtualKeyboard) {
                 contentView.height.toFloat()
+            } else {
+                iv.keyboardView.getLocationInWindow(inputViewLocation)
+                inputViewLocation[1].toFloat()
             }
+        if (contentSize[0] > 0 && contentSize[1] > 0) {
+            candidatesView?.updateParentSize(contentSize)
+        }
+    }
+
+    /**
+     * Hands the candidate window the current keyboard geometry: where it may be placed, and
+     * which part of the parent it must avoid.
+     */
+    fun refreshCandidatesGeometry() {
+        updateCandidatesParentSize()
+        syncCandidatesObstruction()
+    }
+
+    private fun updateDecorLocation() {
+        updateCandidatesParentSize()
         decorView.getLocationOnScreen(decorLocationInt)
         decorLocation[0] = decorLocationInt[0].toFloat()
         decorLocation[1] = decorLocationInt[1].toFloat()
@@ -627,10 +699,17 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
                 touchableInsets = Insets.TOUCHABLE_INSETS_VISIBLE
             }
         }
+        if (showingDialog != null) {
+            // 弹框窗口不可获取焦点（见 showDialog），收不到自身范围以外的触摸。输入法
+            // 窗口必须整框可触摸，由弹框下方的遮罩接管空白处的点击；否则这些点击会
+            // 落到键盘上（输入字符）或穿透到后面的应用。
+            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_FRAME
+        }
         // This callback is the framework's, and InputView only asks for another round when the
         // floating keyboard's bounds actually changed, so it doubles as the signal that the
-        // candidate window has to be re-placed relative to the keyboard.
-        syncCandidatesObstruction()
+        // candidate window has to be re-placed relative to the keyboard -- and to learn the
+        // keyboard's new top when its height changed.
+        refreshCandidatesGeometry()
     }
 
     // always show InputView since we delegate CandidatesView's visibility to it
@@ -1144,6 +1223,20 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
 
     private var showingDialog: Dialog? = null
 
+    val isDialogShowing: Boolean get() = showingDialog != null
+
+    /**
+     * A transparent surface between the dialog window and the keyboard.
+     *
+     * A window that is not focusable does not receive touches outside its own bounds (the flag
+     * implies `FLAG_NOT_TOUCH_MODAL`), so a tap outside the dialog card would reach the keyboard
+     * -- typing behind the dialog -- or the app above it. This view is a child of the IME
+     * window's decor, above everything the input method draws; while it is up [onComputeInsets]
+     * makes the whole IME frame touchable, so those taps land here and cancel the dialog instead
+     * of leaking through.
+     */
+    private var dialogScrim: View? = null
+
     /**
      * Shows one of the theme / colour / sound / schema pickers.
      *
@@ -1159,18 +1252,20 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
      *
      * `FLAG_NOT_FOCUSABLE` keeps the editor focused instead, so the keyboard stays up, the picker
      * is drawn above it, and `FLAG_DIM_BEHIND` dims everything behind. Keeping the keyboard alive
-     * is what the pickers want anyway: they exist to try out a theme while typing. They are
-     * touch-modal and all of them carry a cancel button, so nothing here needs key input.
+     * is what the pickers want anyway: they exist to try out a theme while typing. They carry a
+     * cancel button and no text field, so nothing here needs key input.
      *
      * (`FLAG_ALT_FOCUSABLE_IM` was the old flag. It is the documented way to put a dialog over the
      * keyboard for an *activity*, but for an input method it does the opposite of what is needed:
      * by blocking every view below it from connecting to the input method, it makes the framework
      * stop the very keyboard the dialog is a child of.)
+     *
+     * Not being focusable also means the dialog window never sees touches outside the card; those
+     * are caught by [dialogScrim] instead.
      */
     fun showDialog(dialog: Dialog) {
         showingDialog?.dismiss()
-        // The keyboard stays up behind the picker, so a tap outside it (a keyboard key, say) has to
-        // close the picker rather than be silently swallowed by it.
+        dismissDialogScrim()
         dialog.setCanceledOnTouchOutside(true)
         dialog.window?.also {
             it.attributes.apply {
@@ -1182,11 +1277,78 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
             )
             it.setDimAmount(styledFloat(android.R.attr.backgroundDimAmount))
         }
+        val scrim = newDialogScrim(dialog)
         dialog.setOnDismissListener {
-            showingDialog = null
+            // Dismissal is delivered asynchronously: another dialog and its scrim may already
+            // have replaced this one by the time this listener runs.
+            if (showingDialog === dialog && !dialog.isShowing) showingDialog = null
+            if (dialogScrim === scrim) dismissDialogScrim()
         }
         dialog.show()
+        // 弹框里的第一个可聚焦视图会自动拿到焦点，系统随之画出默认焦点高亮
+        // （一层半透明黑遮罩，看起来像弹框背景发灰）。与输入视图同样的处理：
+        // 遮罩没有存在的必要，触摸交互也不依赖 view focus。
+        disableDialogFocusHighlight(dialog)
         showingDialog = dialog
+        candidatesView?.onDialogVisibilityChanged()
+        // Above the whole input view, candidate window included: anything the input method
+        // draws could otherwise consume a tap that is meant to dismiss the dialog.
+        (decorView as ViewGroup).addView(
+            scrim,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        scrim.bringToFront()
+        dialogScrim = scrim
+        requestInputInsetsUpdate()
+    }
+
+    private fun newDialogScrim(dialog: Dialog): View = View(this).apply {
+        setOnClickListener {
+            if (showingDialog === dialog) dialog.cancel()
+        }
+    }
+
+    /**
+     * Keeps the dialog's content from taking view focus.
+     *
+     * The dialog window is already `FLAG_NOT_FOCUSABLE` (see [showDialog]), but views inside it can
+     * still request focus on their own. A focused view gets the platform's default focus highlight,
+     * a dim layer that reads as a greyed-out dialog card. Nothing in these pickers (lists and
+     * buttons) needs focus -- they are operated by touch -- so the whole subtree is excluded and
+     * the highlight is switched off as well, for views that already held focus.
+     */
+    private fun disableDialogFocusHighlight(dialog: Dialog) {
+        val decor = dialog.window?.decorView as? ViewGroup ?: return
+        decor.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+        decor.isFocusable = false
+        decor.isFocusableInTouchMode = false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            disableDefaultFocusHighlight(decor)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun disableDefaultFocusHighlight(view: View) {
+        view.defaultFocusHighlightEnabled = false
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                disableDefaultFocusHighlight(view.getChildAt(i))
+            }
+        }
+    }
+
+    private fun dismissDialogScrim() {
+        val scrim = dialogScrim
+        if (scrim != null) {
+            dialogScrim = null
+            (scrim.parent as? ViewGroup)?.removeView(scrim)
+            requestInputInsetsUpdate()
+        }
+        // The dialog may be gone without a scrim, but the touch receiver still has to return.
+        candidatesView?.onDialogVisibilityChanged()
     }
 
     /**
@@ -1199,5 +1361,6 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     private fun dismissShowingDialog() {
         showingDialog?.dismiss()
         showingDialog = null
+        dismissDialogScrim()
     }
 }

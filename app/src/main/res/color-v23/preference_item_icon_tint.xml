@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+SPDX-FileCopyrightText: 2026 Rime community
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+<!--
+设置页条目图标色：与标题/摘要同一套禁用态（colorOnSurface @38%，M3 规范），
+可用态保持主题的 onSecondaryContainer。color selector 的 android:alpha 需要
+API 23，低版本用 res/color 的无淡化兜底。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:alpha="0.38"
+        android:color="?attr/colorOnSurface"
+        android:state_enabled="false" />
+    <item android:color="?attr/colorOnSecondaryContainer" />
+</selector>

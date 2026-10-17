@@ -11,6 +11,7 @@ import com.osfans.trime.R
 import com.osfans.trime.data.theme.ColorManager
 import com.osfans.trime.data.theme.DynamicColorScheme
 import com.osfans.trime.data.theme.model.ColorScheme
+import com.osfans.trime.ui.common.RadioListAdapter
 import com.osfans.trime.ui.common.materialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
@@ -29,8 +30,14 @@ object ColorPickerDialog {
                 if (presetSchemes.isEmpty()) {
                     setMessage(R.string.no_color_to_select)
                 } else {
+                    val adapter =
+                        RadioListAdapter(
+                            context,
+                            presetSchemes.map { it.displayName(context) },
+                            currentIndex,
+                        )
                     setSingleChoiceItems(
-                        presetSchemes.map { it.displayName(context) }.toTypedArray(),
+                        adapter,
                         currentIndex,
                     ) { dialog, which ->
                         scope.launch {

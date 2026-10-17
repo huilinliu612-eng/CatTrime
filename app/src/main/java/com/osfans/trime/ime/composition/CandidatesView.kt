@@ -29,8 +29,6 @@ import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.data.theme.ColorManager
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.ime.candidates.popup.PagedCandidatesUi
-import com.osfans.trime.ime.candidates.popup.PaginationUi
-import com.osfans.trime.ime.candidates.popup.PopupCandidatesLayout
 import com.osfans.trime.ime.candidates.popup.resolvedHorizontalLayout
 import com.osfans.trime.ime.core.BaseInputView
 import com.osfans.trime.ime.core.TouchEventReceiverWindow
@@ -74,22 +72,31 @@ class CandidatesView(
     /**
      * Offset of the first candidate the window shows.
      *
-     * Only a new page or a new window capacity resets it (see [updateUi]); the window's arrows move
-     * it within the page without Rime being involved.
+     * Only a new page or a new "candidates per line" setting resets it (see [updateUi]); the
+     * window's arrows move it within the page without Rime being involved.
      */
     private var slotOffset = 0
     private var lastPage: Candidates.Paged? = null
     private var lastPerLine = 0
 
+    /** Whether the previous update laid the candidates out as a row; a flip re-derives the slot. */
+    private var lastHorizontal = false
+
     /**
-     * How many candidates the last laid-out window actually held.
+     * How many candidates the last laid-out window held -- the step the arrows take.
      *
-     * Narrow candidates can make a row hold fewer than the setting allows, and the arrows must step
-     * by what was *shown* -- stepping by the larger setting would jump over the candidates in
-     * between and leave them unreachable. Kept from the last update because it depends on a
-     * measurement this class does not keep.
+     * Only a stacked (vertical) window is cut into several windows; a row shows the whole page,
+     * so its capacity is the page size and a step leaves the page for Rime immediately.
      */
     private var lastCapacity = 0
+
+    /**
+     * Window offsets visited by the arrows within the current page, oldest first.
+     *
+     * A slice always holds the same number of candidates ([lastCapacity]), but a page's last
+     * window may be shorter; replaying the offsets is what keeps a backward step exact.
+     */
+    private val windowHistory = ArrayDeque<Int>()
 
     private val anchorPosition = RectF()
     private val parentSize = floatArrayOf(0f, 0f)
@@ -132,13 +139,23 @@ class CandidatesView(
             onMoveCursor = { pos -> rime.launchOnReady { it.moveCursorPos(pos) } },
         )
 
-    private val candidatesUi =
+    // 显式类型：onCandidateAction 回调里引用了 candidatesUi 自身（toggleFullDisplay），
+    // 省略类型会让编译器陷入递归推断。
+    private val candidatesUi: PagedCandidatesUi =
         PagedCandidatesUi(
             ctx,
             theme,
             onCandidateClick = { index -> rime.launchOnReady { it.selectCandidate(index + slotOffset, global = false) } },
             onCandidateAction = { index, text, view ->
-                showCandidateActionMenu(index + slotOffset, text, view, global = false)
+                // 仅当注解确实被截断且尚未展开时才提供「完整显示」：未截断的候选
+                // 没有可展开内容，已展开的无需再展开，菜单项都不出现。
+                val toggle: (() -> Unit)? =
+                    if (candidatesUi.canToggleFullDisplay(text)) {
+                        { candidatesUi.toggleFullDisplay(text) }
+                    } else {
+                        null
+                    }
+                showCandidateActionMenu(index + slotOffset, text, view, global = false, toggle)
             },
             onPrevPage = { stepRow(forward = false) },
             onNextPage = { stepRow(forward = true) },
@@ -170,32 +187,36 @@ class CandidatesView(
         preeditUi.root.visibility = if (preeditUi.visible) VISIBLE else GONE
         val perLine = perLine()
         val page = candidates
+        // A row shows the whole page, so there is no window to move through and no offset to
+        // keep: the arrows turn Rime's pages. Only the stacked layout is cut into windows.
+        val horizontal = resolvedHorizontalLayout(candidates, layout)
+        // A flip between the row and the stack is as good as a new page: the old offset described
+        // a window of the other layout (and a row always sits at 0), so the stack has to reopen on
+        // whatever Rime highlights instead of keeping an offset that may hide it.
+        val layoutChanged = horizontal != lastHorizontal
         slotOffset =
             when {
-                // A new page (or a new window capacity) puts the window back onto whatever Rime
+                horizontal -> {
+                    windowHistory.clear()
+                    0
+                }
+                // A new page (or a new per-line count) puts the window back onto whatever Rime
                 // highlights: browsing is a detour within a page, not a state that outlives it.
-                page != lastPage || perLine != lastPerLine -> slotOffsetFor(page.highlighted, perLine)
-                else -> slotOffset.coerceAtMost(lastSlotOffset(page.candidates.size, perLine))
+                layoutChanged || page != lastPage || perLine != lastPerLine -> {
+                    windowHistory.clear()
+                    slotOffsetFor(page.highlighted, perLine)
+                }
+                else ->
+                    slotOffset.coerceAtMost(
+                        lastSlotOffset(page.candidates.size, lastCapacity.coerceAtLeast(1)),
+                    )
             }
         lastPage = page
         lastPerLine = perLine
-        // The row's width budget and the column's stack are different problems -- see
-        // [candidateWindow]. Both are fed the same settings-derived numbers here; only the row
-        // puts them to use.
-        val window =
-            candidateWindow(
-                page = page,
-                offset = slotOffset,
-                perLine = perLine,
-                horizontal = resolvedHorizontalLayout(candidates, layout),
-                availableWidth = usableRowWidth(),
-                paginationWidth = if (page.candidates.size > perLine) dp(PaginationUi.WIDTH_DP) else 0,
-                spacingWidth = candidatesUi.spacingFor(perLine),
-                naturalWidths = candidatesUi::naturalWidths,
-            )
+        lastHorizontal = horizontal
+        val window = candidateWindow(page, slotOffset, perLine, horizontal)
         // the candidate layout is queried natively with the page itself
         candidatesUi.update(window.page, layout, usableRowWidth().toInt())
-        candidatesUi.setItemWidth(window.itemWidth)
         lastCapacity = window.capacity
         visibility = if (evaluateVisibility()) {
             VISIBLE
@@ -241,17 +262,34 @@ class CandidatesView(
      * and the arrows turn the page only after every window of it has been shown.
      */
     private fun stepRow(forward: Boolean) {
-        // Step by what the window showed, not by the setting's maximum: a row that could only fit
-        // half of it would otherwise jump over the candidates in between.
-        val capacity = lastCapacity.takeIf { it > 0 } ?: perLine()
-        val next = steppedSlotOffset(slotOffset, capacity, candidates.candidates.size, forward)
-        if (next == null) {
-            rime.launchOnReady { it.changeCandidatePage(!forward) }
+        if (!forward) {
+            // Replay where the row came from; offsets the arrows did not produce (a page reset
+            // puts the window on the highlighted candidate) fall back to a plain step back.
+            val previous =
+                windowHistory.removeLastOrNull()
+                    ?: steppedSlotOffset(slotOffset, stepSize(), candidates.candidates.size, false)
+            if (previous == null) {
+                rime.launchOnReady { it.changeCandidatePage(true) }
+                return
+            }
+            slotOffset = previous
+            updateUi()
             return
         }
+        // Step by what the window showed, not by the setting's maximum: a row that could only fit
+        // half of it would otherwise jump over the candidates in between.
+        val next = steppedSlotOffset(slotOffset, stepSize(), candidates.candidates.size, true)
+        if (next == null) {
+            rime.launchOnReady { it.changeCandidatePage(false) }
+            return
+        }
+        windowHistory.addLast(slotOffset)
         slotOffset = next
         updateUi()
     }
+
+    /** How far a step moves the window: what the last one actually showed. */
+    private fun stepSize(): Int = lastCapacity.takeIf { it > 0 } ?: perLine()
 
     /** Re-derives the row after a setting that sizes it changed, without rebuilding this view. */
     fun refreshSlotLayout() {
@@ -343,9 +381,26 @@ class CandidatesView(
             )
         translationX = tX
         translationY = tY
-        // update touchEventReceiverWindow's position after CandidatesView's
-        touchEventReceiverWindow.showAt(tX.roundToInt(), tY.roundToInt(), w, h)
+        // A modal IME dialog takes every tap on the screen (its scrim covers the input view).
+        // This receiver is a window of its own, above the input view, so it has to step aside
+        // or it would keep feeding taps to the candidate row through the dialog.
+        if (service.isDialogShowing) {
+            touchEventReceiverWindow.dismiss()
+        } else {
+            // update touchEventReceiverWindow's position after CandidatesView's
+            touchEventReceiverWindow.showAt(tX.roundToInt(), tY.roundToInt(), w, h)
+        }
         shouldUpdatePosition = false
+    }
+
+    /** Re-evaluates the touch receiver after a modal IME dialog appeared or went away. */
+    fun onDialogVisibilityChanged() {
+        if (service.isDialogShowing) {
+            touchEventReceiverWindow.dismiss()
+        } else {
+            shouldUpdatePosition = true
+            invalidate()
+        }
     }
 
     fun updateCursorAnchor(
@@ -381,6 +436,25 @@ class CandidatesView(
             if (obstruction == next) return
             obstruction.set(next)
         }
+        shouldUpdatePosition = true
+        invalidate()
+    }
+
+    /**
+     * Refreshes the area this window is placed against, without touching the cursor anchor.
+     *
+     * The height is the keyboard's top edge (or the whole content view while it floats), so it
+     * changes whenever the keyboard changes height. That usually happens while the window is
+     * hidden, and the value captured when it was last shown would then describe a keyboard that
+     * no longer exists -- the window would be docked to the old edge and land on the keys.
+     */
+    fun updateParentSize(parent: FloatArray) {
+        if (parentSize[0] == parent[0] && parentSize[1] == parent[1]) return
+        val widthChanged = parentSize[0] != parent[0]
+        parentSize[0] = parent[0]
+        parentSize[1] = parent[1]
+        // The row is measured against the parent's width, so only a new width re-splits it.
+        if (widthChanged) updateUi()
         shouldUpdatePosition = true
         invalidate()
     }
@@ -463,6 +537,12 @@ class CandidatesView(
     override fun setVisibility(visibility: Int) {
         if (visibility != VISIBLE) {
             touchEventReceiverWindow.dismiss()
+        } else if (this.visibility != VISIBLE) {
+            // Recalibrate on every show: while hidden, the keyboard may have changed height or
+            // been dragged away, and reusing the translation from the previous show would leave
+            // the window at a position that its current anchor/size no longer imply.
+            shouldUpdatePosition = true
+            invalidate()
         }
         super.setVisibility(visibility)
     }

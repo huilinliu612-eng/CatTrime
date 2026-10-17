@@ -10,7 +10,6 @@ import android.os.Bundle
 import android.view.View
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.appcompat.app.AlertDialog
 import androidx.core.app.NotificationCompat
 import androidx.core.os.bundleOf
 import androidx.core.view.ViewCompat
@@ -19,6 +18,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
 import androidx.viewpager2.widget.ViewPager2
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.osfans.trime.R
 import com.osfans.trime.databinding.ActivitySetupBinding
 import com.osfans.trime.ui.setup.SetupPage.Companion.firstUndonePage
@@ -62,8 +62,7 @@ class SetupActivity : FragmentActivity() {
         binding.skipButton.apply {
             text = getString(R.string.setup__skip)
             setOnClickListener {
-                AlertDialog
-                    .Builder(this@SetupActivity)
+                MaterialAlertDialogBuilder(this@SetupActivity)
                     .setMessage(R.string.setup__skip_hint)
                     .setPositiveButton(R.string.setup__skip_hint_yes) { _, _ ->
                         finish()

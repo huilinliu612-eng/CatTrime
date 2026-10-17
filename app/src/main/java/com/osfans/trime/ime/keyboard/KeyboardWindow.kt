@@ -23,6 +23,7 @@ import com.osfans.trime.data.theme.model.TextKeyboard
 import com.osfans.trime.ime.broadcast.EnterKeyDisplayDelegate
 import com.osfans.trime.ime.broadcast.InputBroadcastReceiver
 import com.osfans.trime.ime.core.TrimeInputMethodService
+import com.osfans.trime.ime.keyboard.KeyboardPrefs.isFloatingEffective
 import com.osfans.trime.ime.keyboard.KeyboardPrefs.isLandscapeMode
 import com.osfans.trime.ime.popup.PopupDelegate
 import com.osfans.trime.ime.window.BoardWindow
@@ -95,6 +96,14 @@ class KeyboardWindow :
     private val currentKeyboard: Keyboard? get() = cachedKeyboards[currentKeyboardId]?.first
     private val currentKeyboardView: KeyboardView? get() = cachedKeyboards[currentKeyboardId]?.second
 
+    /**
+     * 当前键盘构造时烘焙的悬浮宽/高档位：InputView 缩放归一的基准
+     * （见 [Keyboard.bakedFloatingWidthPercent] 与 InputView.applyFloatingScale）。
+     * 尚无挂载的键盘时为 null，由调用方回退。
+     */
+    val currentBakedFloatingWidthPercent: Int? get() = currentKeyboard?.bakedFloatingWidthPercent
+    val currentBakedFloatingHeightPercent: Int? get() = currentKeyboard?.bakedFloatingHeightPercent
+
     private val keyboardActionListener = commonKeyboardActionListener.listener
 
     private var lastIsPortrait: Boolean? = null
@@ -136,9 +145,17 @@ class KeyboardWindow :
             return containerWidth
         }
 
-        val padding = theme.generalStyle.run {
-            if (context.isLandscapeMode()) keyboardPaddingLand else keyboardPadding
-        }
+        // 悬浮键盘忽略主题键盘左右 padding：keyboard_padding* 是给贴底的普通键盘
+        // 用的，悬浮卡片下只会无谓挤占可用宽度（与 InputView.updateKeyboardSize
+        // 忽略左右 padding 空位视图对应）。
+        val padding =
+            if (context.isFloatingEffective()) {
+                0
+            } else {
+                theme.generalStyle.run {
+                    if (context.isLandscapeMode()) keyboardPaddingLand else keyboardPadding
+                }
+            }
 
         val safeWidth = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val windowMetrics = context.windowManager.maximumWindowMetrics
@@ -247,8 +264,12 @@ class KeyboardWindow :
             }
         var final = dot.ifEmpty { smartMatchKeyboard() }
 
-        // 切换到横屏布局
-        if (service.isLandscapeMode()) {
+        // 切换到横屏布局。悬浮键盘例外：landscape_keyboard 指定的布局通常更宽，
+        // 悬浮缩放后难以点按，且悬浮卡片的尺寸解算只按竖屏布局校准——实测指定了
+        // landscape_keyboard 的主题在悬浮模式下横屏会整块不可见，故悬浮时始终用
+        // 竖屏布局。「有效悬浮」包含横屏自动悬浮；只有真正回落普通键盘时，
+        // landscape_keyboard 才恢复生效（非悬浮模式维持原始行为）。
+        if (service.isLandscapeMode() && !context.isFloatingEffective()) {
             val landscape =
                 theme.presetKeyboards[final]?.landscapeKeyboard ?: ""
             if (landscape.isNotEmpty() && presetKeyboardIds.contains(landscape)) final = landscape

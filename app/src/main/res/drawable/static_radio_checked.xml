@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    选中态单选圆圈：几何与 framework 的 btn_radio_on_mtrl 完全一致
+    （32dp 盒、24dp 视觉、translate(4,4)，外圈 2dp + 内点 10dp），
+    颜色用应用 MD3 属性——btn_radio_on_mtrl 是 SDK 私有资源，
+    compileSdk 36 的 aapt2 拒绝链接，只能自绘。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <group
+        android:translateX="4"
+        android:translateY="4">
+        <path
+            android:fillColor="?attr/colorPrimary"
+            android:pathData="M12,7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5 5,-2.24 5,-5 -2.24,-5 -5,-5z" />
+        <path
+            android:fillColor="?attr/colorPrimary"
+            android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.42,0 -8,-3.58 -8,-8s3.58,-8 8,-8 8,3.58 8,8 -3.58,8 -8,8z" />
+    </group>
+</vector>

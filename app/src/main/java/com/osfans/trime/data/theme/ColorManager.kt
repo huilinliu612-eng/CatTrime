@@ -14,7 +14,9 @@ import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.NinePatchDrawable
+import android.os.Build
 import androidx.annotation.ColorInt
+import androidx.annotation.RequiresApi
 import androidx.collection.LruCache
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.math.MathUtils
@@ -87,6 +89,8 @@ object ColorManager {
             "on_key_border_color" to "hilited_key_border_color",
             "on_key_text_color" to "hilited_key_text_color",
             "on_key_symbol_color" to "hilited_key_symbol_color",
+            "preview_back_color" to "key_back_color",
+            "preview_text_color" to "key_text_color",
             "popup_back_color" to "key_back_color",
             "popup_text_color" to "key_text_color",
             "hilited_popup_back_color" to "hilited_key_back_color",
@@ -124,7 +128,7 @@ object ColorManager {
     val availableColorSchemes: List<ColorScheme>
         get() = buildList {
             addAll(theme.colorSchemes)
-            if (DynamicColorScheme.isSupported) add(DynamicColorScheme.create(isNightMode))
+            if (DynamicColorScheme.isSupported) add(dynamicColorScheme())
         }
 
     private var bitmapCache: LruCache<String, Bitmap>? = null
@@ -147,9 +151,25 @@ object ColorManager {
         onChangeListeners.forEach { it.onColorChange(theme) }
     }
 
+    /**
+     * The dynamic scheme for the current day/night state, layered on the theme's own scheme.
+     *
+     * The base is what keeps a theme's colour keys that the dynamic palette does not name — the
+     * 同文风 theme's `bgn` / `bbs` / `benter` / `bkg`, a `candidate_border_color`, a background
+     * image — from disappearing when the dynamic scheme is selected.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun dynamicColorScheme(): ColorScheme {
+        val base = if (isNightMode) darkModeColorScheme else lightModeColorScheme
+        return DynamicColorScheme.create(
+            isNightMode,
+            base ?: colorScheme("default") ?: theme.colorSchemes.first(),
+        )
+    }
+
     private fun colorScheme(id: String): ColorScheme? = if (id == DynamicColorScheme.ID && DynamicColorScheme.isSupported) {
         // 动态方案跟随系统深浅色，每次解析都按当前模式生成
-        DynamicColorScheme.create(isNightMode)
+        dynamicColorScheme()
     } else {
         theme.colorSchemes.find { it.id == id }
     }
@@ -177,7 +197,7 @@ object ColorManager {
     private fun evaluateActiveColorScheme(): ColorScheme {
         // 动态配色方案本身自适应深浅色，直接返回，跳过 light/dark 级联
         if (normalModeColor == DynamicColorScheme.ID && DynamicColorScheme.isSupported) {
-            return DynamicColorScheme.create(isNightMode)
+            return dynamicColorScheme()
         }
         return when {
             followSystemDayNight -> {

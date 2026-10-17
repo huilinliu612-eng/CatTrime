@@ -5,7 +5,6 @@
 
 package com.osfans.trime.ime.clipboard
 
-import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Typeface
 import android.view.View
@@ -13,7 +12,6 @@ import androidx.lifecycle.lifecycleScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import com.osfans.trime.R
-import com.osfans.trime.data.db.BulkDeleteScope
 import com.osfans.trime.data.db.ClipboardHelper
 import com.osfans.trime.data.db.CollectionHelper
 import com.osfans.trime.data.db.DatabaseBean
@@ -26,6 +24,8 @@ import com.osfans.trime.ime.keyboard.KeyboardWindow
 import com.osfans.trime.ime.segments.SegmentsWindow
 import com.osfans.trime.ime.window.BoardWindow
 import com.osfans.trime.ime.window.BoardWindowManager
+import com.osfans.trime.ui.common.materialAlertDialogBuilder
+import com.osfans.trime.ui.common.withMaterialTheme
 import com.osfans.trime.ui.main.ClipEditActivity
 import com.osfans.trime.util.AppUtils
 import kotlinx.coroutines.Job
@@ -177,17 +177,12 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
             }
             deleteAllButton.setOnClickListener {
                 val currentItem = viewPager.currentItem
-                // Pinned entries are kept: a pin is the user saying "keep this one", so bulk
-                // deletion has to leave them alone. This used to pass haveUnpinned() into a flag
-                // whose sense was inverted, which wiped the pinned entries for good once every
-                // entry was pinned.
-                val scope = BulkDeleteScope.KEEP_PINNED
                 when (currentItem) {
                     0 -> promptDeleteAll {
-                        ClipboardHelper.deleteAll(scope)
+                        ClipboardHelper.deleteAll(ClipboardHelper.haveUnpinned())
                     }
                     else -> promptDeleteAll {
-                        CollectionHelper.deleteAll(scope)
+                        CollectionHelper.deleteAll(CollectionHelper.haveUnpinned())
                     }
                 }
             }
@@ -206,7 +201,7 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
     }
 
     private fun promptDeleteAll(action: suspend () -> Unit) {
-        val dialog = AlertDialog.Builder(context)
+        val dialog = context.withMaterialTheme().materialAlertDialogBuilder()
             .setTitle(R.string.delete_all)
             .setMessage(R.string.ask_to_delete_all)
             .setPositiveButton(R.string.ok) { _, _ ->

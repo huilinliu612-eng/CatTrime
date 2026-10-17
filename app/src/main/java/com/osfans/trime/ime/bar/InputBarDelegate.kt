@@ -60,6 +60,11 @@ import splitties.views.dsl.core.matchParent
 import java.util.concurrent.Executor
 import kotlin.coroutines.resume
 
+/**
+ * 「隐藏工具栏」只作用于 Always（工具栏态）；Candidate（候选态）与 Tab 态是
+ * 液态键盘等外挂窗口，都必须始终可见——候选栏藏了就无法选词，Tab 态的返回
+ * 按钮/标题栏都在工具栏上，藏了就无法从外挂窗口退出（用户实测卡死）。
+ */
 internal fun shouldShowInputBar(
     hideToolbar: Boolean,
     state: QuickBarStateMachine.State,
@@ -80,9 +85,6 @@ class InputBarDelegate : InputBroadcastReceiver {
     private val prefs = AppPrefs.defaultInstance()
 
     private val hideQuickBar by prefs.keyboard.hideInputBar
-
-    private var blendCompactCandidatesIntoFloatingKeyboard =
-        hideQuickBar && prefs.keyboard.floatingKeyboard.getValue()
 
     private val clipboardSuggestion by prefs.clipboard.clipboardSuggestion
 
@@ -148,32 +150,6 @@ class InputBarDelegate : InputBroadcastReceiver {
             hideKeyboardButton.apply {
                 setOnClickListener { service.requestHideSelf(0) }
                 onSwipe = swipeDownHideKeyboardCallback
-            }
-            floatingKeyboardButton.apply {
-                val isFloating = prefs.keyboard.floatingKeyboard.getValue()
-                setIcon(
-                    if (isFloating) {
-                        R.drawable.ic_baseline_keyboard_24
-                    } else {
-                        R.drawable.ic_floating_keyboard_24
-                    },
-                )
-                contentDescription = context.getString(
-                    if (isFloating) {
-                        R.string.dock_keyboard
-                    } else {
-                        R.string.enable_floating_keyboard
-                    },
-                )
-                setOnClickListener {
-                    prefs.keyboard.floatingKeyboard.setValue(
-                        !prefs.keyboard.floatingKeyboard.getValue(),
-                    )
-                }
-                setOnLongClickListener {
-                    AppUtils.launchMainToKeyboard(context)
-                    true
-                }
             }
             clipboardUi.suggestionView.apply {
                 setOnClickListener {
@@ -275,20 +251,6 @@ class InputBarDelegate : InputBroadcastReceiver {
         view.displayedChild = index
     }
 
-    /** Apply toolbar preferences without replacing the input view hierarchy. */
-    fun onFloatingKeyboardChanged(isFloating: Boolean) {
-        blendCompactCandidatesIntoFloatingKeyboard = hideQuickBar && isFloating
-        alwaysUi.floatingKeyboardButton.apply {
-            setIcon(
-                if (isFloating) R.drawable.ic_baseline_keyboard_24 else R.drawable.ic_floating_keyboard_24,
-            )
-            contentDescription = context.getString(
-                if (isFloating) R.string.dock_keyboard else R.string.enable_floating_keyboard,
-            )
-        }
-        switchUiByState(barStateMachine.currentState)
-    }
-
     fun onHideInputBarChanged() {
         switchUiByState(barStateMachine.currentState)
     }
@@ -324,22 +286,14 @@ class InputBarDelegate : InputBroadcastReceiver {
         }
     }
 
-    private fun barBackground(state: QuickBarStateMachine.State): Drawable? {
-        if (
-            blendCompactCandidatesIntoFloatingKeyboard &&
-            state == QuickBarStateMachine.State.Candidate
-        ) {
-            // Let the floating keyboard's themed background continue through the
-            // compact candidate row instead of drawing a separate, mismatched panel.
-            return null
-        }
-        return ColorManager.getDecorDrawable(
+    private fun barBackground(@Suppress("UNUSED_PARAMETER") state: QuickBarStateMachine.State): Drawable? = // 候选行是 IME 窗口里独立于悬浮卡片的一块视图——返回 null 不会让卡片背景
+        // “透过来”，只会整条透明。任何模式（含悬浮+隐藏工具栏）都必须给出背景。
+        ColorManager.getDecorDrawable(
             "candidate_background",
             "candidate_border_color",
             context.dp(theme.generalStyle.candidateBorder),
             context.dp(theme.generalStyle.candidateBorderRound),
         )
-    }
 
     override fun onStartInput(info: EditorInfo) {
         evalAlwaysUiState()

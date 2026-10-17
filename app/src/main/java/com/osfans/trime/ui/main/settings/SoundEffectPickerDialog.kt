@@ -9,6 +9,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.osfans.trime.R
 import com.osfans.trime.data.soundeffect.SoundEffectManager
+import com.osfans.trime.ui.common.RadioListAdapter
 import com.osfans.trime.ui.common.materialAlertDialogBuilder
 import kotlinx.coroutines.launch
 
@@ -26,8 +27,9 @@ object SoundEffectPickerDialog {
                 if (all.isEmpty()) {
                     setMessage(R.string.no_effect_to_select)
                 } else {
+                    val adapter = RadioListAdapter(context, all, currentIndex)
                     setSingleChoiceItems(
-                        all.toTypedArray(),
+                        adapter,
                         currentIndex,
                     ) { dialog, which ->
                         scope.launch {

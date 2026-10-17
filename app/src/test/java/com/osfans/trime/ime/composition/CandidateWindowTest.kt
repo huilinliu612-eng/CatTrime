@@ -27,55 +27,25 @@ class CandidateWindowTest :
             },
         )
 
-        /** A measurer that records how often it was asked, so "never measured" can be asserted. */
-        fun measurer(width: Int = 200): Pair<MutableList<List<String>>, (List<CandidateProto>) -> List<Int>> {
-            val calls = mutableListOf<List<String>>()
-            return calls to { slot ->
-                calls += slot.map { it.text }
-                List(slot.size) { width }
-            }
-        }
-
         fun vertical(
             page: Candidates.Paged,
             offset: Int = 0,
             perLine: Int,
-        ) = candidateWindow(
-            page = page,
-            offset = offset,
-            perLine = perLine,
-            horizontal = false,
-            availableWidth = 900f,
-            paginationWidth = 0,
-            spacingWidth = 0,
-            naturalWidths = { error("a vertical window must not measure candidates") },
-        )
+        ) = candidateWindow(page, offset, perLine, horizontal = false)
+
+        fun horizontal(
+            page: Candidates.Paged,
+            offset: Int = 0,
+            perLine: Int,
+        ) = candidateWindow(page, offset, perLine, horizontal = true)
 
         Given("a vertical layout and a page longer than the setting allows") {
             Then("the stack is cut to the setting, and the rest waits behind the arrows") {
                 val window = vertical(page(count = 9), perLine = 4)
                 window.page.candidates.map { it.text } shouldBe listOf("c0", "c1", "c2", "c3")
+                window.capacity shouldBe 4
                 window.page.hasNextPage shouldBe true
                 window.page.hasPrevPage shouldBe false
-            }
-
-            Then("nothing is measured, because a stack runs out of height rather than width") {
-                val (calls, naturalWidths) = measurer()
-                candidateWindow(
-                    page = page(count = 9),
-                    offset = 0,
-                    perLine = 4,
-                    horizontal = false,
-                    availableWidth = 900f,
-                    paginationWidth = 0,
-                    spacingWidth = 40,
-                    naturalWidths = naturalWidths,
-                )
-                calls shouldBe emptyList()
-            }
-
-            Then("no width is imposed, so each candidate spans the window and sizes itself") {
-                vertical(page(count = 9), perLine = 4).itemWidth shouldBe 0
             }
 
             Then("the arrows step the stack, exactly as they step a row") {
@@ -100,129 +70,36 @@ class CandidateWindowTest :
             }
         }
 
-        Given("a horizontal row whose candidates all fit") {
-            Then("every one of them is kept, at the widest natural width") {
-                val (_, naturalWidths) = measurer(width = 200)
-                val window = candidateWindow(
-                    page = page(count = 4),
-                    offset = 0,
-                    perLine = 4,
-                    horizontal = true,
-                    availableWidth = 900f,
-                    paginationWidth = 0,
-                    spacingWidth = 0,
-                    naturalWidths = naturalWidths,
-                )
-                window.page.candidates.size shouldBe 4
-                window.itemWidth shouldBe 200
+        Given("a horizontal layout and a page longer than the setting allows") {
+            Then("the page is handed over whole, because the row wraps instead of cutting") {
+                // A setting of 1 must not shrink the page to one candidate: per-candidate hiding
+                // happens in the item, never by dropping candidates from the container.
+                val whole = page(count = 6)
+                val window = horizontal(whole, perLine = 1)
+                window.page.candidates.map { it.text } shouldBe (0 until 6).map { "c$it" }
+            }
+
+            Then("the window's capacity is the whole page, so the arrows turn Rime's pages") {
+                val window = horizontal(page(count = 6, hasPrevPage = true, hasNextPage = true), perLine = 1)
+                window.capacity shouldBe 6
+                steppedSlotOffset(0, window.capacity, pageCount = 6, forward = true) shouldBe null
+                steppedSlotOffset(0, window.capacity, pageCount = 6, forward = false) shouldBe null
+                window.page.hasPrevPage shouldBe true
+                window.page.hasNextPage shouldBe true
+            }
+
+            Then("the row offset is not used, and the highlight stays with its candidate") {
+                val window = horizontal(page(count = 6, highlighted = 4), offset = 3, perLine = 2)
+                window.page.candidates.map { it.text } shouldBe (0 until 6).map { "c$it" }
+                window.page.highlighted shouldBe 4
             }
         }
 
-        Given("a horizontal row whose candidates do not all fit") {
-            Then("only as many as fit are shown, and the row is sized for those") {
-                val (_, naturalWidths) = measurer(width = 200)
-                val window = candidateWindow(
-                    page = page(count = 4),
-                    offset = 0,
-                    perLine = 4,
-                    horizontal = true,
-                    availableWidth = 500f,
-                    paginationWidth = 0,
-                    spacingWidth = 0,
-                    naturalWidths = naturalWidths,
-                )
-                // 3 x 200 = 600 > 500, but 2 x 200 = 400 fits.
-                window.page.candidates.map { it.text } shouldBe listOf("c0", "c1")
-                window.itemWidth shouldBe 200
-            }
-
-            Then("the gaps between candidates come out of the same budget") {
-                val (_, naturalWidths) = measurer(width = 200)
-                val window = candidateWindow(
-                    page = page(count = 4),
-                    offset = 0,
-                    perLine = 4,
-                    horizontal = true,
-                    availableWidth = 900f,
-                    paginationWidth = 0,
-                    spacingWidth = 200,
-                    naturalWidths = naturalWidths,
-                )
-                // 700 usable: 3 x 200 fits, 4 x 200 does not.
-                window.page.candidates.size shouldBe 3
-            }
-
-            Then("the measurer is handed the window's slice, never the whole page") {
-                val (calls, naturalWidths) = measurer(width = 200)
-                candidateWindow(
-                    page = page(count = 20),
-                    offset = 4,
-                    perLine = 3,
-                    horizontal = true,
-                    availableWidth = 900f,
-                    paginationWidth = 0,
-                    spacingWidth = 0,
-                    naturalWidths = naturalWidths,
-                )
-                calls shouldBe listOf(listOf("c4", "c5", "c6"))
-            }
-        }
-
-        Given("a horizontal row before anything has been laid out") {
-            Then("a failed measurement leaves each candidate to size itself") {
-                val (_, naturalWidths) = measurer(width = 0)
-                val window = candidateWindow(
-                    page = page(count = 4),
-                    offset = 0,
-                    perLine = 4,
-                    horizontal = true,
-                    availableWidth = 500f,
-                    paginationWidth = 0,
-                    spacingWidth = 0,
-                    naturalWidths = naturalWidths,
-                )
-                window.itemWidth shouldBe 0
-            }
-        }
-
-        Given("a window capacity") {
-            Then("it is the smaller of the setting and what was measured") {
-                windowCapacity(perLine = 4, fit = 4) shouldBe 4
-                windowCapacity(perLine = 4, fit = 2) shouldBe 2
-                windowCapacity(perLine = 4, fit = 9) shouldBe 4
-            }
-
-            Then("it never collapses to zero, which would stop the arrows dead") {
-                windowCapacity(perLine = 0, fit = 0) shouldBe 1
-                windowCapacity(perLine = 4, fit = 0) shouldBe 1
-            }
-        }
-
-        Given("a row that fits fewer candidates than the setting allows") {
-            Then("walking it with the arrows still reaches every candidate, in order") {
-                val count = 7
-                val (_, naturalWidths) = measurer(width = 200)
-                // 500 usable / 200 per candidate = 2 per window, against a setting of 4.
-                var offset = 0
-                val seen = mutableListOf<String>()
-                val capacities = mutableListOf<Int>()
-                while (true) {
-                    val window = candidateWindow(
-                        page = page(count = count),
-                        offset = offset,
-                        perLine = 4,
-                        horizontal = true,
-                        availableWidth = 500f,
-                        paginationWidth = 0,
-                        spacingWidth = 0,
-                        naturalWidths = naturalWidths,
-                    )
-                    window.page.candidates.forEach { seen += it.text }
-                    capacities += window.capacity
-                    offset = steppedSlotOffset(offset, window.capacity, count, forward = true) ?: break
-                }
-                capacities.first() shouldBe 2
-                seen shouldBe (0 until count).map { "c$it" }
+        Given("a page that fits one row") {
+            Then("the page itself is shown, unchanged") {
+                val whole = page(count = 3, highlighted = 2, hasPrevPage = true, hasNextPage = true)
+                horizontal(whole, perLine = 3).page shouldBe whole
+                horizontal(whole, perLine = 0).page shouldBe whole
             }
         }
     })

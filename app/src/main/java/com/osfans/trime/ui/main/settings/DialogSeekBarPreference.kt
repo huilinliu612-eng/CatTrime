@@ -6,13 +6,14 @@
 package com.osfans.trime.ui.main.settings
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.res.TypedArray
 import android.util.AttributeSet
 import androidx.core.widget.TextViewCompat
 import androidx.preference.DialogPreference
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.slider.Slider
 import com.osfans.trime.R
+import com.osfans.trime.ui.common.materialAlertDialogBuilder
 import splitties.dimensions.dp
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.horizontalMargin
@@ -44,6 +45,9 @@ class DialogSeekBarPreference : DialogPreference {
     private var value = 0
     var default: Int
     var systemDefaultText: String? = null
+
+    /** Text shown instead of the value at 0, for settings where 0 means "disabled". */
+    var zeroText: String? = null
     var min: Int
     var max: Int
     var step: Int
@@ -87,7 +91,29 @@ class DialogSeekBarPreference : DialogPreference {
     override fun onGetDefaultValue(a: TypedArray, index: Int): Any = a.getInteger(index, default)
 
     override fun onSetInitialValue(defaultValue: Any?) {
-        value = getPersistedInt(defaultValue as? Int ?: default)
+        // coerce 到滑条范围：外部写入（等比联动、手势落盘）可能产生范围外的持久化值，
+        // 不钳制的话 Slider 赋值越界会直接抛异常闪退。
+        value = getPersistedInt(defaultValue as? Int ?: default).coerceIn(min, max)
+    }
+
+    // The value can also change *outside* this preference screen (keep-ratio syncing writes the
+    // height pref while the user drags the width slider; a floating-keyboard gesture persists both
+    // dimensions). androidx Preference has no push mechanism for that, so watch the raw store.
+    private val externalValueWatcher = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == this.key) {
+            onSetInitialValue(null)
+            notifyChanged()
+        }
+    }
+
+    override fun onAttached() {
+        super.onAttached()
+        sharedPreferences?.registerOnSharedPreferenceChangeListener(externalValueWatcher)
+    }
+
+    override fun onDetached() {
+        sharedPreferences?.unregisterOnSharedPreferenceChangeListener(externalValueWatcher)
+        super.onDetached()
     }
 
     override fun onClick() {
@@ -96,13 +122,15 @@ class DialogSeekBarPreference : DialogPreference {
 
     /**
      * Generates the text for the given [value] and adds the defined [unit] at the end.
-     * If [systemDefaultText] is not null this method tries to match the given [value] with
-     * [default] and returns [systemDefaultText] upon matching.
+     * A non-null [zeroText] replaces the value at 0; otherwise, if [systemDefaultText] is
+     * not null this method tries to match the given [value] with [default] and returns
+     * [systemDefaultText] upon matching.
      */
-    private fun getTextForValue(value: Int): String = if (systemDefaultText != null && value == (if (useMinAsDefault) min else default)) {
-        systemDefaultText!!
-    } else {
-        "$value $unit"
+    private fun getTextForValue(value: Int): String = when {
+        zeroText != null && value == 0 -> zeroText!!
+        systemDefaultText != null && value == (if (useMinAsDefault) min else default) -> systemDefaultText!!
+        unit.isBlank() -> value.toString()
+        else -> "$value $unit"
     }
 
     /**
@@ -152,7 +180,9 @@ class DialogSeekBarPreference : DialogPreference {
                 },
             )
         }
-        MaterialAlertDialogBuilder(this)
+        // 与其余弹框共用统一的 MD3 包装（非 Material context 下自动套应用主题），
+        // 保证背景、圆角、文字颜色全应用一致。
+        materialAlertDialogBuilder()
             .setTitle(this@DialogSeekBarPreference.title)
             .setView(dialogView)
             .setPositiveButton(android.R.string.ok) { _, _ ->

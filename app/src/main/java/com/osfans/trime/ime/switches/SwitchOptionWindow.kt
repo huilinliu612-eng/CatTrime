@@ -8,6 +8,7 @@ package com.osfans.trime.ime.switches
 import android.app.Dialog
 import android.view.View
 import android.widget.Toast
+import androidx.core.content.res.use
 import androidx.lifecycle.lifecycleScope
 import com.osfans.trime.R
 import com.osfans.trime.core.RimeApi
@@ -22,6 +23,7 @@ import com.osfans.trime.ime.broadcast.InputBroadcastReceiver
 import com.osfans.trime.ime.core.TrimeInputMethodService
 import com.osfans.trime.ime.dialog.EnabledSchemaPickerDialog
 import com.osfans.trime.ime.window.BoardWindow
+import com.osfans.trime.ui.common.withMaterialTheme
 import com.osfans.trime.ui.main.settings.ThemePickerDialog
 import com.osfans.trime.util.AppUtils
 import com.osfans.trime.util.ImePopupMenu
@@ -103,7 +105,7 @@ class SwitchOptionWindow :
                 when (entry) {
                     is SwitchOptionEntry.Static -> when (entry.type) {
                         SwitchOptionEntry.Static.Type.SchemaList -> showDialog { r ->
-                            EnabledSchemaPickerDialog.build(r, service.lifecycleScope, context) {
+                            EnabledSchemaPickerDialog.build(r, service.lifecycleScope, context.withMaterialTheme()) {
                                 setNegativeButton(R.string.enable_schemata) { _, _ ->
                                     AppUtils.launchMainToSchemaList(context)
                                 }
@@ -117,7 +119,7 @@ class SwitchOptionWindow :
                         }
                         SwitchOptionEntry.Static.Type.Keyboard -> AppUtils.launchMainToKeyboard(context)
                         SwitchOptionEntry.Static.Type.ThemeList -> showDialog { r ->
-                            ThemePickerDialog.build(service.lifecycleScope, context) {
+                            ThemePickerDialog.build(service.lifecycleScope, context.withMaterialTheme()) {
                                 r.commitComposition()
                             }
                         }
@@ -135,11 +137,21 @@ class SwitchOptionWindow :
                             // `PopupMenu`, which drops the input session and tears this window down
                             // the moment it opens; see `ImePopupMenu`.
                             val menu = ImePopupMenu(view)
+                            // 选中标记的强调色：从应用 MD3 主题解析（动态色）。colorPrimary 的
+                            // attr 声明在 appcompat（material 1.12+ 已移除 M2 attrs），
+                            // 主题解析链的终点仍是 MD3 的 colorPrimary。
+                            val checkTint =
+                                view.context
+                                    .obtainStyledAttributes(intArrayOf(androidx.appcompat.R.attr.colorPrimary))
+                                    .use { it.getColor(0, 0) }
                             entry.switch.states.forEachIndexed { stateIndex, state ->
                                 val checked = stateIndex == entry.selectedIndex
                                 menu.item(
                                     title = state,
                                     icon = if (checked) R.drawable.ic_baseline_check_circle_24 else 0,
+                                    // 选中标记用动态强调色，且放行尾（选择列表惯例）。
+                                    iconTint = if (checked) checkTint else 0,
+                                    iconAtEnd = true,
                                 ) {
                                     rime.launchOnReady {
                                         options.forEachIndexed { optionIndex, option ->

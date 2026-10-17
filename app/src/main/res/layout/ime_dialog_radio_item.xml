@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    单选弹框的自绘条目：LinearLayout + ImageView（圆点）+ TextView。
+    不依赖 CheckedTextView / app:drawableLeftCompat（后者需要 appcompat 的
+    LayoutInflater factory，输入法路径弹框没有，圆点会完全不绘制）。圆点由
+    RadioListAdapter 按选中态直接 setImageResource，工厂无关、主题颜色由
+    矢量 drawable 内的 ?attr 解析。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:minHeight="48dp"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
+    android:background="?attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/radio_icon"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:scaleType="centerInside"
+        android:contentDescription="@null" />
+
+    <TextView
+        android:id="@+id/radio_text"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="16dp"
+        android:gravity="start|center_vertical"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="?attr/colorOnSurface"
+        android:ellipsize="marquee" />
+</LinearLayout>

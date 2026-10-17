@@ -233,11 +233,17 @@ internal fun palette(
         "candidate_background" to background,
         "liquid_keyboard_background" to background,
         "key_back_color" to keySurface,
-        "text_back_color" to keySurface,
+        // 预编辑区/候选窗口是窗口本身的一部分，和 `back_color` 同层：取键面灰
+        // （keySurface）会让它在白色键盘上方隐约发灰，与主题里 text_back_color
+        // 回退到 back_color 的语义也不一致。
+        "text_back_color" to background,
         "long_text_back_color" to keySurface,
         "popup_back_color" to keySurface,
-        "preview_back_color" to primary,
-        "preview_text_color" to onPrimary,
+        // Key preview: its fallbacks point at the key surface (`key_back_color` /
+        // `key_text_color`), and the live preview uses `popup_*` for the same reason. An accent
+        // here would read as a highlighted key rather than as the key itself.
+        "preview_back_color" to keySurface,
+        "preview_text_color" to onKeySurface,
         // Function keys: shift, backspace, return, the symbol and number rows, the keys that only
         // carry a command -- and anything else the user adds to a layout of their own.
         "off_key_back_color" to functionSurface,
@@ -282,7 +288,10 @@ internal fun palette(
         "hilited_candidate_text_color" to onPrimaryContainer,
         "hilited_comment_text_color" to onPrimaryContainer,
         "hilited_label_color" to onPrimaryContainer,
-        "hilited_candidate_button_color" to primary,
+        // The toolbar's pressed background. ToolButton pairs it with
+        // `hilited_candidate_text_color`, which is onPrimaryContainer, so this has to be the
+        // container too; primary would leave that text at roughly its own tone.
+        "hilited_candidate_button_color" to primaryContainer,
         "hilited_popup_back_color" to primary,
         "hilited_popup_text_color" to onPrimary,
     )

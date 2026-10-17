@@ -9,6 +9,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.lifecycle.LifecycleCoroutineScope
 import com.osfans.trime.R
 import com.osfans.trime.data.theme.ThemeManager
+import com.osfans.trime.ui.common.RadioListAdapter
 import com.osfans.trime.ui.common.materialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,8 +33,14 @@ object ThemePickerDialog {
                 if (allThemes.isEmpty()) {
                     setMessage(R.string.no_theme_to_select)
                 } else {
+                    val adapter =
+                        RadioListAdapter(
+                            context,
+                            allThemes.map { it.name },
+                            selectedIndex,
+                        )
                     setSingleChoiceItems(
-                        allThemes.map { it.name }.toTypedArray(),
+                        adapter,
                         selectedIndex,
                     ) { dialog, which ->
                         scope.launch {

@@ -122,6 +122,10 @@ class AppPrefs(
             const val FLOATING_KEYBOARD = "floating_keyboard"
             const val FLOATING_KEYBOARD_WIDTH = "floating_keyboard_width"
             const val FLOATING_KEYBOARD_HEIGHT = "floating_keyboard_height"
+            const val FLOATING_KEYBOARD_KEEP_RATIO = "floating_keyboard_keep_ratio"
+            const val FLOATING_KEYBOARD_BAR_POSITION = "floating_keyboard_bar_position"
+            const val FLOATING_KEYBOARD_CORNER_RADIUS = "floating_keyboard_corner_radius"
+            const val FLOATING_KEYBOARD_AUTO_LANDSCAPE = "floating_keyboard_auto_landscape"
             const val FLOATING_KEYBOARD_OFFSET_X = "floating_keyboard_offset_x"
             const val FLOATING_KEYBOARD_OFFSET_Y = "floating_keyboard_offset_y"
             const val FLOATING_PREEDIT_OFFSET_X = "floating_preedit_offset_x"
@@ -131,7 +135,6 @@ class AppPrefs(
 
             const val USE_SOFT_CURSOR = "use_soft_cursor"
             const val HIDE_INPUT_BAR = "hide_input_bar"
-            const val BOTTOM_TOGGLE_MARGIN = "bottom_toggle_margin"
             const val HIDE_KEY_SYMBOL = "hide_key_symbol"
             const val HIDE_KEY_HINT = "hide_key_hint"
 
@@ -176,16 +179,35 @@ class AppPrefs(
             ALWAYS(R.string.always),
         }
 
+        enum class FloatingBarPosition(override val stringRes: Int) : PreferenceDelegateEnum {
+            TOP(R.string.floating_bar_top),
+            BOTTOM(R.string.floating_bar_bottom),
+        }
+
         val floatingKeyboard = switch(
             R.string.floating_keyboard,
             FLOATING_KEYBOARD,
             false,
             R.string.floating_keyboard_summary,
         )
+
+        // 横屏自动悬浮：独立于 [floatingKeyboard]，只在实际横屏时额外启用悬浮，
+        // 从不改写 [floatingKeyboard] 本身——回到竖屏或重启后，竖屏是否悬浮仍
+        // 严格按用户自己的开关状态。注册顺序即设置页顺序。
+        val floatingKeyboardAutoLandscape = switch(
+            R.string.floating_keyboard_landscape,
+            FLOATING_KEYBOARD_AUTO_LANDSCAPE,
+            false,
+            R.string.floating_keyboard_landscape_summary,
+        )
+
+        /** 悬浮键盘相关设置：任一入口可能让悬浮生效时都应可调（含仅横屏自动悬浮）。 */
+        private fun floatingSettingsEnabled(): Boolean = floatingKeyboard.getValue() || floatingKeyboardAutoLandscape.getValue()
+
         val floatingKeyboardWidth = int(
             R.string.floating_keyboard_width,
             FLOATING_KEYBOARD_WIDTH,
-            86,
+            80,
             // The drag handle stops at FLOATING_KEYBOARD_MIN_WIDTH_DP, which on a typical phone
             // lands around 40% of the screen's short side. Keeping the slider's floor below that
             // means a width reached by dragging is never shown as something else in settings.
@@ -193,25 +215,35 @@ class AppPrefs(
             100,
             "%",
             2,
-        ) { floatingKeyboard.getValue() }
+        ) { floatingSettingsEnabled() }
+
+        // 高度滑条的上下限与宽度一致（40-100）：等比模式下两者共享同一档位并双向
+        // 联动，范围不对称时高度档位（如 45）在旋转或联动钳制后会跑出滑条可表达的
+        // 区间，等比关系随之失效。
         val floatingKeyboardHeight = int(
             R.string.floating_keyboard_height,
             FLOATING_KEYBOARD_HEIGHT,
+            80,
+            40,
             100,
-            70,
-            130,
             "%",
-            5,
-        ) { floatingKeyboard.getValue() }
+            2,
+        ) { floatingSettingsEnabled() }
+        val floatingKeyboardKeepRatio = switch(
+            R.string.floating_keyboard_keep_ratio,
+            FLOATING_KEYBOARD_KEEP_RATIO,
+            false,
+            R.string.floating_keyboard_keep_ratio_summary,
+        ) { floatingSettingsEnabled() }
         val floatingPreeditOffsetX = int(
             R.string.floating_preedit_offset_x,
             FLOATING_PREEDIT_OFFSET_X,
-            0,
+            16,
             -120,
             120,
             "dp",
-            2,
-        ) { floatingKeyboard.getValue() }
+            1,
+        ) { floatingSettingsEnabled() }
         val floatingPreeditOffsetY = int(
             R.string.floating_preedit_offset_y,
             FLOATING_PREEDIT_OFFSET_Y,
@@ -219,10 +251,37 @@ class AppPrefs(
             -64,
             64,
             "dp",
-            2,
-        ) { floatingKeyboard.getValue() }
+            1,
+        ) { floatingSettingsEnabled() }
         val floatingKeyboardOffsetX = int(FLOATING_KEYBOARD_OFFSET_X, 0)
         val floatingKeyboardOffsetY = int(FLOATING_KEYBOARD_OFFSET_Y, 0)
+
+        // 悬浮键盘拖动条位置：注册顺序即设置页顺序，需要显示在“启用横屏模式”之上。
+        val floatingKeyboardBarPosition =
+            list(
+                R.string.floating_keyboard_bar_position,
+                FLOATING_KEYBOARD_BAR_POSITION,
+                FloatingBarPosition.TOP,
+                object : PreferenceDelegate.Serializer<FloatingBarPosition> {
+                    override fun serialize(t: FloatingBarPosition) = t.name
+
+                    override fun deserialize(raw: String) = FloatingBarPosition.entries.find { it.name.equals(raw, ignoreCase = true) }
+                },
+                FloatingBarPosition.entries.toList(),
+                FloatingBarPosition.entries.map { it.stringRes },
+            ) { floatingSettingsEnabled() }
+
+        // 悬浮键盘圆角半径：注册顺序即设置页顺序，紧跟拖动条位置之后。0 = 直角。
+        val floatingKeyboardCornerRadius =
+            int(
+                R.string.floating_keyboard_corner_radius,
+                FLOATING_KEYBOARD_CORNER_RADIUS,
+                24,
+                0,
+                48,
+                "dp",
+                2,
+            ) { floatingSettingsEnabled() }
 
         val landscapeMode = enum(R.string.enable_landscape_mode, LANDSCAPE_MODE, LandscapeMode.NEVER)
         val splitSpacePercent = int(
@@ -237,14 +296,6 @@ class AppPrefs(
         val useSoftCursor = switch(R.string.use_soft_cursor, USE_SOFT_CURSOR, true)
 
         val hideInputBar = switch(R.string.hide_input_bar, HIDE_INPUT_BAR, false)
-        val bottomToggleMargin = int(
-            R.string.bottom_toggle_margin,
-            BOTTOM_TOGGLE_MARGIN,
-            0,
-            0,
-            48,
-            "dp",
-        )
         val hideKeySymbol = switch(R.string.hide_key_symbol, HIDE_KEY_SYMBOL, false)
         val hideKeyHint = switch(R.string.hide_key_hint, HIDE_KEY_HINT, false)
 
@@ -415,6 +466,7 @@ class AppPrefs(
             const val ITEM_BACKGROUND = "candidates_item_background"
             const val ITEM_SPACING = "candidates_item_spacing"
             const val ITEM_BACKGROUND_ALPHA = "candidates_item_background_alpha"
+            const val ROW_LIMIT = "candidates_row_limit"
         }
 
         val mode = enum(R.string.show_candidates_window, MODE, PopupCandidatesMode.DISABLED)
@@ -487,6 +539,22 @@ class AppPrefs(
             0,
             100,
             "%",
+        )
+
+        /**
+         * 每条候选的最大行数，超出部分按候选逐个隐藏；0 = 禁用该上限（完整排版）。
+         *
+         * 横向与纵向布局均生效：横向行放不下时由 flex 换行，页内候选不会被裁掉。
+         * 被隐藏的内容可长按候选，通过「完整显示」菜单临时展开单条。
+         */
+        val candidateRowLimit = int(
+            R.string.candidates_row_limit,
+            ROW_LIMIT,
+            2,
+            0,
+            10,
+            unitRes = R.string.candidates_row_limit_unit,
+            zeroLabel = R.string.disable,
         )
     }
 

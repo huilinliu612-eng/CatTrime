@@ -10,6 +10,7 @@ import android.view.KeyEvent
 import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.data.theme.model.TextKeyboard
+import com.osfans.trime.ime.keyboard.KeyboardPrefs.isFloatingEffective
 import com.osfans.trime.ime.keyboard.KeyboardPrefs.isLandscapeMode
 import splitties.bitflags.hasFlag
 import splitties.dimensions.dp
@@ -92,7 +93,6 @@ class Keyboard(
     val resetAsciiMode = selfConfig?.resetAsciiMode ?: true
     var lastAsciiMode: Boolean = asciiMode
 
-    val landscapeKeyboard: String? = selfConfig?.landscapeKeyboard
     private val preferredSplitPercent by AppPrefs.defaultInstance().keyboard.splitSpacePercent
     private val landscapePercent =
         intArrayOf(
@@ -111,22 +111,46 @@ class Keyboard(
     val isLock = selfConfig?.lock ?: false // 切換程序時記憶鍵盤
     val asciiKeyboard: String? = selfConfig?.asciiKeyboard // 英文鍵盤
 
+    /**
+     * 构造时烘焙进键盘几何的悬浮宽/高档位（%）。
+     *
+     * 网格的像素几何（行高缩放、key.x/y）在构造时按当次档位算死，视图测量高度也来自
+     * 这套几何（KeyboardView.onMeasure 用 [height]，无视父容器规格）——档位真正的
+     * 载体是本对象而不是偏好。InputView 归一缩放时以此为基准：宽度变化触发的
+     * refreshKeyboards 会按当前偏好重新构造本对象（重新烘焙），基准随新对象走、
+     * 缩放立即归一——否则布局已烘焙新档位而 scaleY 仍持旧比例，同一档位被施加两次，
+     * 表现为松手后键盘高度被额外压扁（宽度因 scaleX 恒归一而不受影响）。
+     */
+    val bakedFloatingWidthPercent: Int = AppPrefs.defaultInstance().keyboard.floatingKeyboardWidth.getValue()
+
+    val bakedFloatingHeightPercent: Int = AppPrefs.defaultInstance().keyboard.floatingKeyboardHeight.getValue()
+
+    /**
+     * 键区高度（含悬浮档位）。悬浮卡片不使用横屏高度变体：卡片的宽度按屏幕短边换算，
+     * 横竖屏是同一物理宽度，若高度改用更矮的 keyboard_height_land，卡片就会「宽多高少」，
+     * 等比例缩放也救不回来（基准本身已经变形）。悬浮时统一取竖屏高度，卡片随方向
+     * 旋转保持完全相同的几何。
+     */
     val keyboardHeight: Int =
-        resolvePositive(
-            selfConfig?.let {
-                pickLandscape(it.keyboardHeight, it.keyboardHeightLand, context.isLandscapeMode())
-            },
-            pickLandscape(
-                theme.generalStyle.keyboardHeight,
-                theme.generalStyle.keyboardHeightLand,
-                context.isLandscapeMode(),
-            ),
-        ) { context.dp(it) }.let { resolvedHeight ->
-            val keyboardPrefs = AppPrefs.defaultInstance().keyboard
-            if (keyboardPrefs.floatingKeyboard.getValue()) {
-                (resolvedHeight * keyboardPrefs.floatingKeyboardHeight.getValue() / 100f).toInt()
-            } else {
-                resolvedHeight
+        context.isFloatingEffective().let { floating ->
+            val useLandscapeGeometry = context.isLandscapeMode() && !floating
+            resolvePositive(
+                selfConfig?.let {
+                    pickLandscape(it.keyboardHeight, it.keyboardHeightLand, useLandscapeGeometry)
+                },
+                pickLandscape(
+                    theme.generalStyle.keyboardHeight,
+                    theme.generalStyle.keyboardHeightLand,
+                    useLandscapeGeometry,
+                ),
+            ) { context.dp(it) }.let { resolvedHeight ->
+                val keyboardPrefs = AppPrefs.defaultInstance().keyboard
+                // 悬浮档位只作用于「有效悬浮」：横屏回落普通键盘时高度不再乘档位。
+                if (floating) {
+                    (resolvedHeight * keyboardPrefs.floatingKeyboardHeight.getValue() / 100f).toInt()
+                } else {
+                    resolvedHeight
+                }
             }
         }
 
@@ -149,7 +173,8 @@ class Keyboard(
 
             val maxColumns = if (selfConfig.columns == -1) Int.MAX_VALUE else selfConfig.columns
 
-            val isSplit = context.isLandscapeMode() && landscapePercent > 0
+            // 悬浮键盘不分割：分割比例只作用于贴边的横屏键盘。
+            val isSplit = !context.isFloatingEffective() && context.isLandscapeMode() && landscapePercent > 0
             val splitRatio = if (isSplit) landscapePercent / 100f else 0f
 
             val oneWeightWidthPx =
@@ -165,9 +190,17 @@ class Keyboard(
             var column = 0
             var rowHeight = keyHeight
             var totalKeyWidth = 0f
+            var rowIndex = 0
+
+            // Row each key belongs to, decided once here and reused when the keys are created.
+            // Deciding twice is not equivalent: the second pass places widths computed with the
+            // split ratio and may stretch the key that lands on the right edge, so it can wrap a
+            // key the first pass kept on the previous row -- and then index a row height that does
+            // not exist.
+            val keyRows = IntArray(keys.size)
 
             // determine row count, row heights, total row weights; does not create Key objects
-            for (key in keys) {
+            for ((keyIndex, key) in keys.withIndex()) {
 
                 // determine the width weight of this key
                 val keyWidthWeight =
@@ -182,7 +215,10 @@ class Keyboard(
                     x = 0
                     column = 0
                     totalKeyWidth = 0f
+                    rowIndex++
                 }
+
+                keyRows[keyIndex] = rowIndex
 
                 // first key of a row defines the row height
                 if (column == 0) {
@@ -237,18 +273,19 @@ class Keyboard(
             val spacers = mutableListOf<Triple<Int, Int, Int>>()
 
             // create Key objects, assign position, size, offsets
-            for (textKey in keys) {
+            for ((keyIndex, textKey) in keys.withIndex()) {
 
                 val keyWidthWeight =
                     if (textKey.width == 0f && textKey.hasClickAction) keyboardKeyWidth else textKey.width
 
                 var widthPx = (keyWidthWeight * oneWeightWidthPx).toInt()
 
-                // wrap to next row if limits are exceeded
-                if (column >= maxColumns || xPos + widthPx > allowedWidth) {
+                // follow the row assignment of the first pass instead of re-deciding it
+                val targetRow = keyRows[keyIndex]
+                if (targetRow != row) {
                     xPos = 0
                     yPos += currentRowHeight
-                    row++
+                    row = targetRow
                     column = 0
                     rowWeightAccumulo = 0f
                     splitInserted = false
@@ -293,9 +330,13 @@ class Keyboard(
                 key.x = xPos
                 key.y = yPos
 
-                // correct minor rounding errors on the right edge
+                // Correct minor rounding errors on the right edge. Only the last key of a row
+                // may take this: stretching a key in the middle would push everything after it
+                // past the edge, which the first pass never accounted for.
+                val isRowLast = keyIndex == keys.lastIndex || keyRows[keyIndex + 1] != targetRow
                 val rightGap = abs(allowedWidth - xPos - widthPx)
-                key.width = if (rightGap <= allowedWidth / 100) allowedWidth - xPos else widthPx
+                key.width =
+                    if (isRowLast && rightGap <= allowedWidth / 100) allowedWidth - xPos else widthPx
 
                 key.height = currentRowHeight
                 key.row = row

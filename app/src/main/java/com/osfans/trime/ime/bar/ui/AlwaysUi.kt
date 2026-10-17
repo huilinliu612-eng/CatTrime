@@ -6,6 +6,7 @@
 package com.osfans.trime.ime.bar.ui
 
 import android.content.Context
+import android.widget.HorizontalScrollView
 import android.widget.ViewAnimator
 import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -25,6 +26,7 @@ import splitties.views.dsl.core.Ui
 import splitties.views.dsl.core.add
 import splitties.views.dsl.core.lParams
 import splitties.views.dsl.core.matchParent
+import splitties.views.dsl.core.wrapContent
 import timber.log.Timber
 
 class AlwaysUi(
@@ -68,7 +70,6 @@ class AlwaysUi(
     val inlineSuggestionsUi = InlineSuggestionsUi(ctx)
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24)
-    val floatingKeyboardButton = ToolButton(ctx, R.drawable.ic_floating_keyboard_24)
     private val rightMostButton =
         ViewAnimator(ctx).apply {
             add(hideKeyboardButton, lParams(matchParent, matchParent))
@@ -80,9 +81,40 @@ class AlwaysUi(
         R.drawable.ic_baseline_more_horiz_24,
     )
 
+    /**
+     * 工具栏按钮区的横向滚动容器：悬浮键盘等窄空间下按钮不再被压缩变形（按钮
+     * flexShrink=0 + 不换行），放不下时滚动查看。左右两端的按钮保持固定，
+     * 只有中间区域滚动。
+     *
+     * 中间按钮用 FlexDirection.ROW_REVERSE 贴右侧 firstButton 停靠。包进横向滚动后
+     * 该停靠会失效：HorizontalScrollView 对滚动轴的测量恒为 UNSPECIFIED(0)（见其
+     * measureChild），子视图 layoutParams 里的宽度被完全忽略——所以手动改宽度无效，
+     * fillViewport 也不能用（它把子视图强制测成视口宽，内容溢出时滚动量归零、
+     * 溢出按钮被裁掉且无法滚到）。改用平移：布局后若内容窄于视口，把内容整体右移
+     * 补齐差值，恢复贴右停靠；内容溢出时平移归零，保持可滚动，并首次滑到最右端
+     * 以还原原版的初始可见范围。
+     */
+    private var buttonsScrolledToStart = false
+
+    private val buttonsScroller =
+        HorizontalScrollView(ctx).apply {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            add(buttonsUi.root, lParams(wrapContent, matchParent))
+            addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                // computeHorizontalScrollRange 是 protected，用子视图宽度求溢出。
+                val overflow = buttonsUi.root.width - v.width
+                buttonsUi.root.translationX = (-overflow).coerceAtLeast(0).toFloat()
+                if (overflow > 0 && !buttonsScrolledToStart) {
+                    buttonsScrolledToStart = true
+                    scrollTo(overflow, 0)
+                }
+            }
+        }
+
     private val animator =
         ViewAnimator(ctx).apply {
-            add(buttonsUi.root, lParams(matchParent, matchParent))
+            add(buttonsScroller, lParams(matchParent, matchParent))
             add(clipboardUi.root, lParams(matchParent, matchParent))
             add(inlineSuggestionsUi.root, lParams(matchParent, matchParent))
         }
@@ -90,7 +122,6 @@ class AlwaysUi(
     override val root: ConstraintLayout = constraintLayout {
         val (leftWidth, leftHeight) = buttonsUi.getButtonSize(theme.toolBar.primaryButton)
         val (rightWidth, rightHeight) = buttonsUi.getButtonSize(theme.toolBar.buttons.firstOrNull())
-        val (floatingWidth, floatingHeight) = buttonsUi.getButtonSize(null)
 
         add(
             leftMostButton,
@@ -107,18 +138,10 @@ class AlwaysUi(
             },
         )
         add(
-            floatingKeyboardButton,
-            lParams(floatingWidth, floatingHeight) {
-                before(rightMostButton)
-                centerVertically()
-            },
-        )
-        add(
             animator,
             lParams(matchConstraints, matchParent) {
                 after(leftMostButton)
-                before(floatingKeyboardButton)
-                endOfParent()
+                before(rightMostButton)
                 centerVertically()
             },
         )

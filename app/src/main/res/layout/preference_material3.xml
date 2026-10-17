@@ -39,7 +39,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
             android:layout_height="24dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
-            app:tint="?attr/colorOnSecondaryContainer" />
+            app:tint="@color/preference_item_icon_tint" />
     </FrameLayout>
 
     <LinearLayout
@@ -55,7 +55,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
             android:ellipsize="end"
             android:maxLines="2"
             android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-            android:textColor="?attr/colorOnSurface" />
+            android:textColor="@color/preference_item_title_text" />
 
         <TextView
             android:id="@android:id/summary"
@@ -65,7 +65,7 @@ SPDX-License-Identifier: GPL-3.0-or-later
             android:ellipsize="end"
             android:maxLines="4"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-            android:textColor="?attr/colorOnSurfaceVariant" />
+            android:textColor="@color/preference_item_summary_text" />
     </LinearLayout>
 
     <LinearLayout

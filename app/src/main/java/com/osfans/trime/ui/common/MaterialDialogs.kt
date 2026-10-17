@@ -28,3 +28,14 @@ fun Context.materialAlertDialogBuilder(): MaterialAlertDialogBuilder {
         }
     return MaterialAlertDialogBuilder(dialogContext)
 }
+
+/**
+ * 强制套上应用 MD3 主题的 context。
+ *
+ * 输入法服务注入的 context 主题不可控（di 绑定、manifest 声明都可能变化），而 MD3 弹框的
+ * 次级样式（按钮色、列表样式）从 **builder 的 context** 解析。单选条目的圆点不在这里处理：
+ * 主题层替换条目布局会被 MaterialAlertDialogBuilder 后套的主题遮蔽，mtrl 条目的
+ * `drawableLeftCompat` 又依赖 appcompat 的 LayoutInflater factory（只有 Activity 有），
+ * 两条路都走不通，统一改由 [RadioListAdapter] 自绘条目。键盘路径打开弹框前先经此包装。
+ */
+fun Context.withMaterialTheme(): Context = ContextThemeWrapper(this, R.style.Theme_TrimeAppTheme)

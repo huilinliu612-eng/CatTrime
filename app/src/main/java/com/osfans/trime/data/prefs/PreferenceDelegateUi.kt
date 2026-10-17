@@ -140,6 +140,8 @@ abstract class PreferenceDelegateUi<T : Preference>(
         val min: Int,
         val max: Int,
         val unit: String = "",
+        @StringRes
+        val unitRes: Int? = null,
         enableUiOn: (() -> Boolean)? = null,
     ) : PreferenceDelegateUi<EditTextPreference>(key, enableUiOn) {
         override fun createUi(context: Context) = EditTextIntPreference(context).apply {
@@ -152,7 +154,7 @@ abstract class PreferenceDelegateUi<T : Preference>(
             setDialogTitle(this@EditTextInt.title)
             min = this@EditTextInt.min
             max = this@EditTextInt.max
-            unit = this@EditTextInt.unit
+            unit = this@EditTextInt.unitRes?.let { context.getString(it) } ?: this@EditTextInt.unit
         }
     }
 
@@ -168,6 +170,10 @@ abstract class PreferenceDelegateUi<T : Preference>(
         @StringRes
         val defaultLabel: Int? = null,
         val useMinAsDefault: Boolean = false,
+        @StringRes
+        val unitRes: Int? = null,
+        @StringRes
+        val zeroLabel: Int? = null,
         enableUiOn: (() -> Boolean)? = null,
     ) : PreferenceDelegateUi<DialogSeekBarPreference>(key, enableUiOn) {
         override fun createUi(context: Context) = DialogSeekBarPreference(context).apply {
@@ -176,11 +182,12 @@ abstract class PreferenceDelegateUi<T : Preference>(
             isSingleLineTitle = false
             summaryProvider = DialogSeekBarPreference.SimpleSummaryProvider
             this@SeekBarInt.defaultLabel?.let { systemDefaultText = context.getString(it) }
+            this@SeekBarInt.zeroLabel?.let { zeroText = context.getString(it) }
             setDefaultValue(this@SeekBarInt.defaultValue)
             setTitle(this@SeekBarInt.title)
             min = this@SeekBarInt.min
             max = this@SeekBarInt.max
-            unit = this@SeekBarInt.unit
+            unit = this@SeekBarInt.unitRes?.let { context.getString(it) } ?: this@SeekBarInt.unit
             step = this@SeekBarInt.step
             useMinAsDefault = this@SeekBarInt.useMinAsDefault
         }

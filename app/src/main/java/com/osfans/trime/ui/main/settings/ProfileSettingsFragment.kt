@@ -11,7 +11,6 @@ import android.provider.DocumentsContract
 import android.view.ViewGroup
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
@@ -22,6 +21,7 @@ import com.osfans.trime.data.base.DataManager
 import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.data.prefs.PreferenceDelegate
 import com.osfans.trime.ui.common.PaddingPreferenceFragment
+import com.osfans.trime.ui.common.materialAlertDialogBuilder
 import com.osfans.trime.ui.common.withLoadingDialog
 import com.osfans.trime.ui.main.MainViewModel
 import com.osfans.trime.util.ResourceUtils
@@ -150,7 +150,7 @@ class ProfileSettingsFragment : PaddingPreferenceFragment() {
                                     },
                                 )
                             }
-                            AlertDialog.Builder(ctx)
+                            ctx.materialAlertDialogBuilder()
                                 .setTitle(R.string.user_data_dir)
                                 .setView(dialogContent)
                                 .setPositiveButton(android.R.string.ok) { _, _ ->
@@ -221,8 +221,7 @@ class ProfileSettingsFragment : PaddingPreferenceFragment() {
                 addPreference(R.string.reset, R.string.reset_hint) {
                     val items = ctx.assets.list("shared") ?: return@addPreference
                     val checked = BooleanArray(items.size) { false }
-                    AlertDialog
-                        .Builder(context)
+                    ctx.materialAlertDialogBuilder()
                         .setTitle(R.string.reset)
                         .setMultiChoiceItems(items, checked) { _, id, isChecked ->
                             checked[id] = isChecked

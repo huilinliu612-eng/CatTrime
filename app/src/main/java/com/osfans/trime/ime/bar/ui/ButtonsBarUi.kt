@@ -10,6 +10,7 @@ import androidx.annotation.DrawableRes
 import androidx.core.view.children
 import com.google.android.flexbox.AlignItems
 import com.google.android.flexbox.FlexDirection
+import com.google.android.flexbox.FlexWrap
 import com.google.android.flexbox.FlexboxLayout
 import com.google.android.flexbox.JustifyContent
 import com.osfans.trime.data.theme.Theme
@@ -27,6 +28,9 @@ class ButtonsBarUi(
         alignItems = AlignItems.CENTER
         justifyContent = JustifyContent.FLEX_START
         flexDirection = FlexDirection.ROW_REVERSE
+        // 按钮不换行：空间不足时交给外层横向滚动，而不是压缩按钮（图标变形）
+        // 或折行成两行（挤压键盘高度）。
+        flexWrap = FlexWrap.NOWRAP
     }
 
     val firstButton: ToolButton?
@@ -62,6 +66,9 @@ class ButtonsBarUi(
             val size = getButtonSize(config)
             val lParams = FlexboxLayout.LayoutParams(size.first, size.second).apply {
                 marginEnd = ctx.dp(theme.toolBar.buttonSpacing)
+                // flexShrink 默认 1，空间不足会把按钮压变形；禁掉后按钮保持原尺寸，
+                // 溢出部分由 AlwaysUi 里的横向滚动条接管。
+                flexShrink = 0f
             }
             root.addView(button, lParams)
         }

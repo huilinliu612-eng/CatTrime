@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+SPDX-FileCopyrightText: 2026 Rime community
+SPDX-License-Identifier: GPL-3.0-or-later
+-->
+
+<!--
+设置页条目标题色：禁用态压到 M3 规范的 38%（disabled content）。
+preference 库重绑时会把 enabled 同步到 itemView 整棵树，selector 由视图状态
+驱动自动刷新——开关切换即时生效，无需任何代码遍历。
+color selector 的 android:alpha 需要 API 23，低版本用 res/color 的无淡化兜底。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:alpha="0.38"
+        android:color="?attr/colorOnSurface"
+        android:state_enabled="false" />
+    <item android:color="?attr/colorOnSurface" />
+</selector>

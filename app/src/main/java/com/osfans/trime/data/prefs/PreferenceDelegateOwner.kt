@@ -170,6 +170,10 @@ abstract class PreferenceDelegateOwner(
         @StringRes
         defaultLabel: Int? = null,
         useMinAsDefault: Boolean = false,
+        @StringRes
+        unitRes: Int? = null,
+        @StringRes
+        zeroLabel: Int? = null,
         enableUiOn: (() -> Boolean)? = null,
     ): PreferenceDelegate<Int> {
         val pref = PreferenceDelegate(sharedPreferences, key, defaultValue)
@@ -182,11 +186,13 @@ abstract class PreferenceDelegateOwner(
                 min,
                 max,
                 unit,
+                unitRes,
                 enableUiOn,
             )
         } else {
             PreferenceDelegateUi.SeekBarInt(
-                title, key, defaultValue, min, max, unit, step, defaultLabel, useMinAsDefault, enableUiOn,
+                title, key, defaultValue, min, max, unit, step, defaultLabel, useMinAsDefault,
+                unitRes, zeroLabel, enableUiOn,
             )
         }
         pref.register()
