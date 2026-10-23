@@ -4063,6 +4063,7 @@ preset_keys:
   hide_input_bar: {label: 隐藏工具栏, send: FUNCTION, command: switch_hide_input_bar}
   candidates_window_mode: {label: 切换候选窗口, send: FUNCTION, command: switch_candidates_window}
   floating_keyboard_mode: {label: 切换悬浮键盘, send: FUNCTION, command: switch_floating_keyboard}
+  one_hand_switch: {label: 单手模式, send: FUNCTION, command: switch_one_hand_mode}
   # trime命令
   Date: {label: 日期, send: FUNCTION, command: date, option: " yyyy-MM-dd "}
   Time: {label: 時間, send: FUNCTION, command: date, option: "HH:mm:ss"} #時間： date 格式

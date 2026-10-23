@@ -200,6 +200,7 @@ class CommonKeyboardActionListener {
                     "switch_floating_keyboard" -> switchFloatingKeyboard()
                     "switch_hide_input_bar" -> switchHideInputBar()
                     "switch_candidates_window" -> switchCandidatesWindow()
+                    "switch_one_hand_mode" -> switchOneHandMode()
                     else -> handleIntentAction(action.command, arg)
                 }
             }
@@ -361,6 +362,11 @@ class CommonKeyboardActionListener {
                 service.refreshCandidatesViewMode()
                 // 候選欄與候選窗口切換時清理當前輸入，避免殘留的候選/預編輯引發意外行為
                 rime.launchOnReady { api -> api.clearComposition() }
+            }
+
+            private fun switchOneHandMode() {
+                val preference = prefs.keyboard.oneHandMode
+                preference.setValue((preference.getValue() + 1) % 3)
             }
 
             private fun handleSettings(action: KeyAction) {
