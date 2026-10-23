@@ -103,6 +103,12 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
                 service.lifecycleScope.launch { ClipboardHelper.delete(id) }
             }
 
+            override fun onDeleteAll() {
+                promptDeleteAll {
+                    ClipboardHelper.deleteAll(ClipboardHelper.haveUnpinned())
+                }
+            }
+
             override val enableCollection: Boolean = true
         }
     }
@@ -121,6 +127,14 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
                 }
             }
 
+            override fun onUnpin(id: Int) {
+                service.lifecycleScope.launch { CollectionHelper.unpin(id) }
+            }
+
+            override fun onPin(id: Int) {
+                service.lifecycleScope.launch { CollectionHelper.pin(id) }
+            }
+
             override fun onEdit(id: Int) {
                 AppUtils.launchClipEdit(context, id, ClipEditActivity.FROM_COLLECTION)
             }
@@ -137,6 +151,12 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
 
             override fun onDelete(id: Int) {
                 service.lifecycleScope.launch { CollectionHelper.delete(id) }
+            }
+
+            override fun onDeleteAll() {
+                promptDeleteAll {
+                    CollectionHelper.deleteAll(CollectionHelper.haveUnpinned())
+                }
             }
 
             override val enableCollection: Boolean = false
@@ -193,16 +213,8 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
                     setTextColor(ColorManager.getColor("key_text_color"))
                 }
             }
-            deleteAllButton.setOnClickListener {
-                val currentItem = viewPager.currentItem
-                when (currentItem) {
-                    0 -> promptDeleteAll {
-                        ClipboardHelper.deleteAll(ClipboardHelper.haveUnpinned())
-                    }
-                    else -> promptDeleteAll {
-                        CollectionHelper.deleteAll(CollectionHelper.haveUnpinned())
-                    }
-                }
+            hideKeyboardButton.setOnClickListener {
+                service.requestHideSelf(0)
             }
         }
     }
@@ -239,7 +251,7 @@ class ClipboardWindow(private val initialTab: Int = 0) : BoardWindow.BarBoardWin
             R.drawable.ic_baseline_push_pin_24
         }
         clipboardLayout.titleUi.returnAfterPasteButton.setIcon(iconRes)
-        // 调整大头针图标的大小，使其与垃圾桶图标保持一致
+        // 调整大头针图标的大小，使其与隐藏键盘图标保持一致
         clipboardLayout.titleUi.returnAfterPasteButton.setIconScale(0.85f)
     }
 

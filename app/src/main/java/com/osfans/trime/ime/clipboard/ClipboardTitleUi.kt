@@ -27,7 +27,7 @@ class ClipboardTitleUi(override val ctx: Context, private val theme: Theme) : Ui
 
     val returnAfterPasteButton = ToolButton(ctx, R.drawable.ic_baseline_push_pin_24)
 
-    val deleteAllButton = ToolButton(ctx, R.drawable.ic_baseline_delete_sweep_24)
+    val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24)
 
     private val size = theme.generalStyle.run { candidateViewHeight + commentHeight }
 
@@ -43,11 +43,11 @@ class ClipboardTitleUi(override val ctx: Context, private val theme: Theme) : Ui
             returnAfterPasteButton,
             lParams(dp(size), dp(size)) {
                 centerVertically()
-                before(deleteAllButton, dp(6))
+                before(hideKeyboardButton, dp(6))
             },
         )
         add(
-            deleteAllButton,
+            hideKeyboardButton,
             lParams(dp(size), dp(size)) {
                 centerVertically()
                 endOfParent()
