@@ -5,7 +5,6 @@
 
 package com.osfans.trime.data.backup
 
-import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -14,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.osfans.trime.R
+import com.osfans.trime.ui.common.materialAlertDialogBuilder
 import com.osfans.trime.ui.common.withLoadingDialog
 import com.osfans.trime.util.getFileFromUri
 import com.osfans.trime.util.toast
@@ -55,8 +55,8 @@ class BackupRestoreDialog(private val fragment: Fragment) {
             )
         val checked = booleanArrayOf(true, true, true)
 
-        AlertDialog
-            .Builder(context)
+        context
+            .materialAlertDialogBuilder()
             .setTitle(R.string.select_backup_items)
             .setMultiChoiceItems(items, checked) { _, which, isChecked ->
                 checked[which] = isChecked
@@ -234,8 +234,8 @@ class BackupRestoreDialog(private val fragment: Fragment) {
             checked.add(true)
         }
 
-        AlertDialog
-            .Builder(context)
+        context
+            .materialAlertDialogBuilder()
             .setTitle(R.string.select_restore_items)
             .setMultiChoiceItems(items.toTypedArray(), checked.toBooleanArray()) { _, which, isChecked ->
                 checked[which] = isChecked
@@ -285,7 +285,8 @@ class BackupRestoreDialog(private val fragment: Fragment) {
     }
 
     private fun showRestartDialog(context: Context) {
-        AlertDialog.Builder(context)
+        context
+            .materialAlertDialogBuilder()
             .setTitle(R.string.restart_app)
             .setMessage(R.string.restart_app_hint)
             .setPositiveButton(R.string.restart) { _, _ ->
