@@ -82,7 +82,9 @@ abstract class ClipboardAdapter(
                 val iconTint = ctx.styledColor(android.R.attr.colorControlNormal)
                 val menu =
                     ImePopupMenu(anchor)
-                        .item(R.string.edit, R.drawable.ic_baseline_edit_24, iconTint) {
+                        .item(R.string.extract, R.drawable.ic_baseline_visibility_24, iconTint) {
+                            onExtractRequest(bean.text ?: "")
+                        }.item(R.string.edit, R.drawable.ic_baseline_edit_24, iconTint) {
                             onEdit(bean.id)
                         }.item(R.string.share, R.drawable.ic_baseline_share_24, iconTint) {
                             onShare(bean)
@@ -93,18 +95,21 @@ abstract class ClipboardAdapter(
                                 item(R.string.collect, R.drawable.ic_baseline_star_24, iconTint) {
                                     onCollect(bean)
                                 }
-                                if (bean.pinned) {
-                                    item(R.string.simple_key_unpin, R.drawable.ic_outline_push_pin_24, iconTint) {
-                                        onUnpin(bean.id)
-                                    }
-                                } else {
-                                    item(R.string.simple_key_pin, R.drawable.ic_baseline_push_pin_24, iconTint) {
-                                        onPin(bean.id)
-                                    }
+                            }
+                            if (bean.pinned) {
+                                item(R.string.simple_key_unpin, R.drawable.ic_outline_push_pin_24, iconTint) {
+                                    onUnpin(bean.id)
+                                }
+                            } else {
+                                item(R.string.simple_key_pin, R.drawable.ic_baseline_push_pin_24, iconTint) {
+                                    onPin(bean.id)
                                 }
                             }
                             item(R.string.delete, R.drawable.ic_baseline_delete_24, iconTint) {
                                 onDelete(bean.id)
+                            }
+                            item(R.string.delete_all, R.drawable.ic_baseline_delete_sweep_24, iconTint) {
+                                onDeleteAll()
                             }
                             onDismiss = { if (this === popupMenu) popupMenu = null }
                         }
@@ -115,6 +120,8 @@ abstract class ClipboardAdapter(
             }
         }
     }
+
+    abstract fun onExtractRequest(text: String)
 
     abstract fun onPaste(bean: DatabaseBean)
 
@@ -131,6 +138,8 @@ abstract class ClipboardAdapter(
     open fun onCollect(bean: DatabaseBean) {}
 
     abstract fun onDelete(id: Int)
+
+    abstract fun onDeleteAll()
 
     abstract val enableCollection: Boolean
 
