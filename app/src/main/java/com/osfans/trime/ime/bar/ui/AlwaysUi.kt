@@ -6,6 +6,7 @@
 package com.osfans.trime.ime.bar.ui
 
 import android.content.Context
+import android.view.View
 import android.widget.ViewAnimator
 import androidx.annotation.DrawableRes
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -71,6 +72,10 @@ class AlwaysUi(
     val inlineSuggestionsUi = InlineSuggestionsUi(ctx)
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24, scope)
+    val asrkbVoiceButton =
+        ToolButton(ctx, R.drawable.ic_baseline_mic_24, scope).apply {
+            visibility = View.GONE
+        }
     private val rightMostButton =
         ViewAnimator(ctx).apply {
             add(hideKeyboardButton, lParams(matchParent, matchParent))
@@ -101,9 +106,16 @@ class AlwaysUi(
             },
         )
         add(
-            rightMostButton,
+            rightButtonAnimator,
             lParams(rightWidth, rightHeight) {
                 endOfParent()
+                centerVertically()
+            },
+        )
+        add(
+            asrkbVoiceButton,
+            lParams(rightWidth, rightHeight) {
+                before(rightButtonAnimator)
                 centerVertically()
             },
         )
@@ -111,8 +123,7 @@ class AlwaysUi(
             animator,
             lParams(matchConstraints, matchParent) {
                 after(leftMostButton)
-                before(rightMostButton)
-                endOfParent()
+                before(asrkbVoiceButton)
                 centerVertically()
             },
         )
@@ -151,7 +162,7 @@ class AlwaysUi(
     private fun updateRightMostButton(state: State) {
         val hasFirstButton = buttonsUi.firstButton != null
         val showFirst = hasFirstButton && (theme.toolBar.buttons.isNotEmpty() || state != State.Toolbar)
-        rightMostButton.displayedChild = if (showFirst) 1 else 0
+        rightButtonAnimator.displayedChild = if (showFirst) 1 else 0
     }
 
     private fun updateLeftMostButton(state: State) {
@@ -168,4 +179,4 @@ class AlwaysUi(
             height = buttonHeight
         }
     }
-}
+        }

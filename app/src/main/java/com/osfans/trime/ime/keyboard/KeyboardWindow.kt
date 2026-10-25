@@ -291,6 +291,22 @@ class KeyboardWindow(di: DI) :
         currentKeyboardView?.invalidateAllKeys()
     }
 
+    fun showAsrkbVoiceOverlay() {
+        currentKeyboardView?.showVoiceOverlay()
+    }
+
+    fun hideAsrkbVoiceOverlay() {
+        currentKeyboardView?.hideVoiceOverlay()
+    }
+
+    fun startAsrkbVoiceOverlayWave() {
+        currentKeyboardView?.startVoiceOverlayWave()
+    }
+
+    fun updateAsrkbVoiceOverlayAmplitude(amplitude: Float) {
+        currentKeyboardView?.updateVoiceOverlayAmplitude(amplitude)
+    }
+
     override fun onStartInput(info: EditorInfo) {
         val targetKeyboard =
             when (info.imeOptions and EditorInfo.IME_FLAG_FORCE_ASCII) {

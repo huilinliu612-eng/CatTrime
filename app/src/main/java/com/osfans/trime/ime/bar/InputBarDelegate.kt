@@ -41,6 +41,8 @@ import com.osfans.trime.ime.keyboard.KeyboardWindow
 import com.osfans.trime.ime.switches.SwitchOptionWindow
 import com.osfans.trime.ime.window.BoardWindow
 import com.osfans.trime.ime.window.BoardWindowManager
+import com.osfans.trime.link.AsrkbSpeechClient
+import com.osfans.trime.link.AsrkbVoiceHoldSessionController
 import com.osfans.trime.ui.main.ClipEditActivity
 import com.osfans.trime.util.AppUtils
 import kotlinx.coroutines.Job
@@ -80,6 +82,25 @@ class InputBarDelegate(override val di: DI) :
     private val clipboardSuggestion by prefs.clipboard.clipboardSuggestion
 
     private val clipboardSuggestionTimeout by prefs.clipboard.clipboardSuggestionTimeout
+
+    private val asrkbVoiceHoldController by lazy {
+        AsrkbVoiceHoldSessionController(
+            service = service,
+            showOverlay = { keyboardWindow.showAsrkbVoiceOverlay() },
+            startWave = { keyboardWindow.startAsrkbVoiceOverlayWave() },
+            updateAmplitude = { amplitude -> keyboardWindow.updateAsrkbVoiceOverlayAmplitude(amplitude) },
+            hideOverlay = { keyboardWindow.hideAsrkbVoiceOverlay() },
+            onSessionFinished = {
+                alwaysUi.asrkbVoiceButton.setIcon(R.drawable.ic_baseline_mic_24)
+            },
+        )
+    }
+
+    private val asrkbAidlVoiceInputEnabled by prefs.general.asrkbAidlVoiceInputEnabled
+
+    private val asrkbAidlVoiceToolbarButtonEnabled by prefs.general.asrkbAidlVoiceToolbarButtonEnabled
+
+    private var asrkbHoldingChangedListener: ((Boolean) -> Unit)? = null
 
     private var clipboardTimeoutJob: Job? = null
 
@@ -155,6 +176,34 @@ class InputBarDelegate(override val di: DI) :
                     true
                 }
             }
+            asrkbVoiceButton.apply {
+                val enabled = asrkbAidlVoiceInputEnabled && asrkbAidlVoiceToolbarButtonEnabled
+                if (enabled) {
+                    visibility = View.VISIBLE
+                    setIcon(if (AsrkbSpeechClient.isHolding()) R.drawable.ic_baseline_stop_24 else R.drawable.ic_baseline_mic_24)
+                } else {
+                    visibility = View.GONE
+                }
+                setOnClickListener {
+                    if (AsrkbSpeechClient.isHolding()) {
+                        stopAsrkbVoiceFromToolbar()
+                        return@setOnClickListener
+                    }
+                    if (!(asrkbAidlVoiceInputEnabled && asrkbAidlVoiceToolbarButtonEnabled)) return@setOnClickListener
+                    startAsrkbVoiceFromToolbar()
+                }
+            }
+
+            val executor = ContextCompat.getMainExecutor(service)
+            val holdingListener: (Boolean) -> Unit = { holding ->
+                executor.execute {
+                    if (!asrkbVoiceButton.isAttachedToWindow) return@execute
+                    if (asrkbVoiceButton.visibility != View.VISIBLE) return@execute
+                    asrkbVoiceButton.setIcon(if (holding) R.drawable.ic_baseline_stop_24 else R.drawable.ic_baseline_mic_24)
+                }
+            }
+            asrkbHoldingChangedListener = holdingListener
+            AsrkbSpeechClient.onHoldingChanged = holdingListener
             clipboardUi.dismiss.setOnClickListener {
                 dismissClipboardSuggestion()
             }
@@ -263,6 +312,20 @@ class InputBarDelegate(override val di: DI) :
             evalAlwaysUiState()
             ClipboardHelper.addOnUpdateListener(onClipboardUpdateListener)
             syncToolbarOptionStates()
+
+            addOnAttachStateChangeListener(
+                object : View.OnAttachStateChangeListener {
+                    override fun onViewAttachedToWindow(v: View) {}
+
+                    override fun onViewDetachedFromWindow(v: View) {
+                        val listener = asrkbHoldingChangedListener
+                        if (listener != null && AsrkbSpeechClient.onHoldingChanged === listener) {
+                            AsrkbSpeechClient.onHoldingChanged = null
+                        }
+                        asrkbHoldingChangedListener = null
+                    }
+                },
+            )
         }
     }
 
@@ -376,5 +439,14 @@ class InputBarDelegate(override val di: DI) :
 
     override fun onRimeOptionUpdated(value: RimeMessage.OptionMessage.Data) {
         alwaysUi.updateButtonsStyle(value.option, value.value)
+    }
+
+    private fun startAsrkbVoiceFromToolbar() {
+        alwaysUi.asrkbVoiceButton.setIcon(R.drawable.ic_baseline_stop_24)
+        asrkbVoiceHoldController.start()
+    }
+
+    private fun stopAsrkbVoiceFromToolbar() {
+        asrkbVoiceHoldController.stop()
     }
 }

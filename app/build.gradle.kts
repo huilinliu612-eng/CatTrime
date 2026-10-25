@@ -22,7 +22,7 @@ android {
     buildToolsVersion = "36.0.0"
 
     defaultConfig {
-        applicationId = "com.osfans.trime"
+        applicationId = "com.osfans.trime.bibi"
         minSdk = 21
         targetSdk = 37
         versionCode = 20261101
