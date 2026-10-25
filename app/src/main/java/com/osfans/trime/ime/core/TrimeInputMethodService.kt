@@ -383,7 +383,10 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
     override fun onWindowShown() {
         super.onWindowShown()
         // navbar foreground/background color would reset every time window shows
-        navBarManager.evaluate(window.window!!, inputDeviceManager.useVirtualKeyboard, scope.colors)
+        val scope = themeScope ?: return
+        window.window?.let {
+            navBarManager.evaluate(it, inputDeviceManager.useVirtualKeyboard, scope.colors)
+        }
     }
 
     override fun onWindowHidden() {
