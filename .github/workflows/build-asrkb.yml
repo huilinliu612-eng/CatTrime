@@ -44,6 +44,8 @@ jobs:
         run: |
           echo ${GITHUB_REF#refs/*/}
           echo CI_BRANCH=${GITHUB_REF#refs/*/} >> $GITHUB_ENV
+          # artifact/release 名称不能含 /，这里做一次净化
+          echo CI_BRANCH_SAFE=$(echo "${GITHUB_REF#refs/*/}" | tr '/' '-') >> $GITHUB_ENV
 
       - name: Setup Java
         uses: actions/setup-java@v6
@@ -99,7 +101,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v7
         with:
-          name: trime-asrkb-${{ env.CI_BRANCH }}-${{ github.sha }}
+          name: trime-asrkb-${{ env.CI_BRANCH_SAFE }}-${{ github.sha }}
           path: dist/*.apk
           retention-days: 90
 
