@@ -408,4 +408,20 @@ class KeyboardWindow(di: DI) :
     override fun onDetached() {
         currentKeyboardView?.onDetach()
     }
+
+    fun showAsrkbVoiceOverlay() {
+        currentKeyboardView?.showVoiceOverlay()
+    }
+
+    fun hideAsrkbVoiceOverlay() {
+        currentKeyboardView?.hideVoiceOverlay()
+    }
+
+    fun startAsrkbVoiceOverlayWave() {
+        currentKeyboardView?.startVoiceOverlayWave()
+    }
+
+    fun updateAsrkbVoiceOverlayAmplitude(amplitude: Float) {
+        currentKeyboardView?.updateVoiceOverlayAmplitude(amplitude)
+    }
 }
