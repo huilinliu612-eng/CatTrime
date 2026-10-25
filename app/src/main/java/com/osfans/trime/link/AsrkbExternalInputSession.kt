@@ -7,11 +7,11 @@ import kotlinx.coroutines.launch
 
 internal data class AsrkbCursorSnapshot(
     val beforeCursor: String,
-    val afterCursor: String
+    val afterCursor: String,
 ) {
     fun bounded(maxChars: Int = MAX_CONTEXT_CHARS) = AsrkbCursorSnapshot(
         beforeCursor.takeLast(maxChars),
-        afterCursor.take(maxChars)
+        afterCursor.take(maxChars),
     )
 
     fun text(): String = beforeCursor + afterCursor
@@ -25,14 +25,14 @@ internal data class AsrkbCorrectionReport(
     val sessionId: Int,
     val generation: Long,
     val snapshot: AsrkbCursorSnapshot,
-    val reason: String
+    val reason: String,
 )
 
 internal data class AsrkbEditorIdentity(
     val packageName: String,
     val fieldId: Int,
     val inputType: Int,
-    val imeOptions: Int
+    val imeOptions: Int,
 )
 
 internal class AsrkbEditorGenerationTracker {
@@ -56,16 +56,14 @@ internal class AsrkbEditorGenerationTracker {
 internal class AsrkbNegotiationToken(
     val sessionId: Int,
     val generation: Long,
-    val connection: Any?
+    val connection: Any?,
 )
 
 internal class AsrkbNegotiationGate {
     private var current: AsrkbNegotiationToken? = null
 
     @Synchronized
-    fun begin(sessionId: Int, generation: Long, connection: Any?): AsrkbNegotiationToken {
-        return AsrkbNegotiationToken(sessionId, generation, connection).also { current = it }
-    }
+    fun begin(sessionId: Int, generation: Long, connection: Any?): AsrkbNegotiationToken = AsrkbNegotiationToken(sessionId, generation, connection).also { current = it }
 
     @Synchronized
     fun isCurrent(token: AsrkbNegotiationToken): Boolean = current === token
@@ -80,7 +78,7 @@ internal fun launchAsrkbEditReport(
     scope: CoroutineScope,
     report: AsrkbCorrectionReport,
     submit: (AsrkbCorrectionReport) -> Unit,
-    onComplete: () -> Unit = {}
+    onComplete: () -> Unit = {},
 ): Job = scope.launch(Dispatchers.IO) {
     try {
         submit(report)
@@ -92,7 +90,7 @@ internal fun launchAsrkbEditReport(
 internal suspend inline fun negotiateOptionalInputThenContinue(
     crossinline queryRequirements: suspend () -> Int?,
     crossinline attachInputContext: suspend (Int) -> Boolean,
-    crossinline continueOriginalAsr: suspend () -> Unit
+    crossinline continueOriginalAsr: suspend () -> Unit,
 ): Boolean {
     var correctionEnabled = false
     try {
@@ -108,14 +106,14 @@ internal suspend inline fun negotiateOptionalInputThenContinue(
 }
 
 internal class AsrkbCorrectionTracker(
-    private val timeoutMs: Long = 30_000L
+    private val timeoutMs: Long = 30_000L,
 ) {
     private data class Active(
         val sessionId: Int,
         val generation: Long,
         val startedAtMs: Long,
         val original: AsrkbCursorSnapshot,
-        var lastNonEmpty: AsrkbCursorSnapshot
+        var lastNonEmpty: AsrkbCursorSnapshot,
     )
 
     private var active: Active? = null
@@ -127,11 +125,11 @@ internal class AsrkbCorrectionTracker(
         initial: AsrkbCursorSnapshot,
         finalText: String,
         committed: AsrkbCursorSnapshot,
-        nowMs: Long
+        nowMs: Long,
     ): Boolean {
         val expected = AsrkbCursorSnapshot(
             beforeCursor = initial.beforeCursor + finalText,
-            afterCursor = initial.afterCursor
+            afterCursor = initial.afterCursor,
         ).bounded()
         if (sessionId <= 0 || generation <= 0L || finalText.isEmpty() || committed.bounded() != expected) {
             active = null
@@ -145,7 +143,7 @@ internal class AsrkbCorrectionTracker(
     fun update(
         generation: Long,
         snapshot: AsrkbCursorSnapshot,
-        nowMs: Long
+        nowMs: Long,
     ): AsrkbCorrectionReport? {
         val current = active ?: return null
         if (current.generation != generation) {
@@ -170,7 +168,7 @@ internal class AsrkbCorrectionTracker(
     fun finish(
         generation: Long,
         snapshot: AsrkbCursorSnapshot,
-        reason: String
+        reason: String,
     ): AsrkbCorrectionReport? {
         val current = active ?: return null
         if (current.generation != generation) {
@@ -202,7 +200,7 @@ internal class AsrkbCorrectionTracker(
             sessionId = current.sessionId,
             generation = current.generation,
             snapshot = current.lastNonEmpty,
-            reason = reason
+            reason = reason,
         )
     }
 }
@@ -230,6 +228,6 @@ internal object AsrkbEditorPrivacy {
     private val TEXT_PASSWORD_VARIATIONS = setOf(
         TYPE_TEXT_VARIATION_PASSWORD,
         TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
-        TYPE_TEXT_VARIATION_WEB_PASSWORD
+        TYPE_TEXT_VARIATION_WEB_PASSWORD,
     )
 }

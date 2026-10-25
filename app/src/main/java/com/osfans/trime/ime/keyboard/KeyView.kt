@@ -222,8 +222,7 @@ class KeyView(
         }
     }
 
-    private fun isAsrkbVoiceLongPressAction(action: KeyAction?): Boolean =
-        asrkbAidlVoiceInputEnabled && action?.code == KeyEvent.KEYCODE_VOICE_ASSIST
+    private fun isAsrkbVoiceLongPressAction(action: KeyAction?): Boolean = asrkbAidlVoiceInputEnabled && action?.code == KeyEvent.KEYCODE_VOICE_ASSIST
 
     private fun processKeyAction(action: KeyAction, behavior: KeyBehavior) {
         Timber.d("processKeyAction: label=${key.getLabel()}, code=${action.code}, type=$behavior")

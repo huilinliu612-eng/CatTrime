@@ -14,7 +14,7 @@ class AsrkbExternalInputSessionTest :
                 initial = AsrkbCursorSnapshot("before ", " after"),
                 finalText = "Tory",
                 committed = AsrkbCursorSnapshot("before Tory", " after"),
-                nowMs = 0
+                nowMs = 0,
             ) shouldBe true
 
             tracker.update(2, AsrkbCursorSnapshot("before Tauri", " after"), 100) shouldBe null
@@ -37,7 +37,7 @@ class AsrkbExternalInputSessionTest :
                 AsrkbCursorSnapshot("before ", " after"),
                 "Tory",
                 AsrkbCursorSnapshot("before Tory", " after"),
-                0
+                0,
             ) shouldBe true
             tracker.update(2, AsrkbCursorSnapshot("before Tauri", " after"), 100) shouldBe null
 
@@ -46,7 +46,7 @@ class AsrkbExternalInputSessionTest :
                     8,
                     2,
                     AsrkbCursorSnapshot("before Tauri", " after"),
-                    "editor_action"
+                    "editor_action",
                 )
             tracker.finishLast(2, "editor_action") shouldBe null
         }
@@ -67,7 +67,7 @@ class AsrkbExternalInputSessionTest :
                 AsrkbCursorSnapshot("before ", " after"),
                 "Tory",
                 AsrkbCursorSnapshot("before Tory", " after"),
-                0
+                0,
             ) shouldBe true
 
             tracker.finishLast(2, "finish_input") shouldBe null
@@ -94,7 +94,7 @@ class AsrkbExternalInputSessionTest :
                     attachCalled = true
                     true
                 },
-                continueOriginalAsr = { originalStarted = true }
+                continueOriginalAsr = { originalStarted = true },
             )
 
             correctionEnabled shouldBe false
@@ -114,7 +114,7 @@ class AsrkbExternalInputSessionTest :
                         reportThread = Thread.currentThread()
                         order += "submit"
                     },
-                    onComplete = { order += "complete" }
+                    onComplete = { order += "complete" },
                 ).join()
             }
 

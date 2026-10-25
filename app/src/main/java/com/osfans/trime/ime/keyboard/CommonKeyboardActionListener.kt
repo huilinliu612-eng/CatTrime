@@ -15,7 +15,6 @@ import com.osfans.trime.R
 import com.osfans.trime.core.KeyModifiers
 import com.osfans.trime.core.RimeApi
 import com.osfans.trime.core.RimeKeyEvent
-import com.osfans.trime.core.RimeKeyMapping
 import com.osfans.trime.daemon.RimeDaemon
 import com.osfans.trime.daemon.RimeSession
 import com.osfans.trime.daemon.launchOnReady
@@ -208,9 +207,10 @@ class CommonKeyboardActionListener(override val di: DI) : DIAware {
                 }
                 val liquidTagList = theme.liquidKeyboard.getTagList()
                 val index = liquidTagList.indexOfFirst { tag ->
-                    tag.label == arg || runCatching {
-                        LiquidKeyboard.DataType.valueOf(arg.uppercase())
-                    }.getOrNull() == tag.type
+                    tag.label == arg ||
+                        runCatching {
+                            LiquidKeyboard.DataType.valueOf(arg.uppercase())
+                        }.getOrNull() == tag.type
                 }
 
                 if (index >= 0) {
@@ -271,6 +271,7 @@ class CommonKeyboardActionListener(override val di: DI) : DIAware {
                         Timber.i("try to restart rime via command ...")
                         RimeDaemon.restartRime()
                     }
+
                     "SYNC_USER_DATA" -> {
                         Timber.i("try to sync rime user data via command ...")
                         rime.launchOnReady { api -> api.syncUserData() }

@@ -21,12 +21,12 @@ import android.os.IBinder
 import android.os.Parcel
 import android.os.SystemClock
 import androidx.preference.PreferenceManager
+import timber.log.Timber
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import timber.log.Timber
 
 internal class AsrkbClipboardSyncBridge(context: Context) {
     private val appContext = context.applicationContext
@@ -40,9 +40,13 @@ internal class AsrkbClipboardSyncBridge(context: Context) {
     private var generation = 0L
     private var destroyed = false
     private var windowVisible = false
+
     @Volatile private var connection: ServiceConnection? = null
+
     @Volatile private var binder: IBinder? = null
+
     @Volatile private var sessionId: String? = null
+
     @Volatile private var activeHost: Host? = null
     private var subscription: Subscription? = null
 
@@ -338,8 +342,7 @@ internal class AsrkbClipboardSyncBridge(context: Context) {
     }
 
     @Synchronized
-    private fun isCurrent(candidateGeneration: Long): Boolean =
-        !destroyed && generation == candidateGeneration
+    private fun isCurrent(candidateGeneration: Long): Boolean = !destroyed && generation == candidateGeneration
 
     @Synchronized
     private fun startObserving(host: Host, token: String): Boolean {
@@ -402,8 +405,10 @@ internal class AsrkbClipboardSyncBridge(context: Context) {
             val extras = clip.description.extras
             when {
                 extras == null -> false
+
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
                     extras.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE, false)
+
                 else -> extras.getBoolean("android.content.extra.IS_SENSITIVE", false)
             }
         } catch (t: Throwable) {
@@ -432,47 +437,54 @@ internal class AsrkbClipboardSyncBridge(context: Context) {
                         else -> finish(RESULT_CLIPBOARD_FAILED, "clipboard write failed")
                     }
                 }
+
                 ACTION_GET_CLIPBOARD_TEXT -> {
                     val snapshot = readClipboardSnapshot()
                     if (snapshot?.text == null) {
                         finish(RESULT_CLIPBOARD_FAILED, "empty clipboard")
                     } else {
-                        setResultExtras((getResultExtras(true) ?: Bundle()).apply {
-                            putString(EXTRA_TEXT, snapshot.text)
-                            putInt(EXTRA_CLIPBOARD_TEXT_CHARS, snapshot.text.length)
-                            putBoolean(EXTRA_IS_CLIPBOARD_SENSITIVE, snapshot.sensitive)
-                        })
+                        setResultExtras(
+                            (getResultExtras(true) ?: Bundle()).apply {
+                                putString(EXTRA_TEXT, snapshot.text)
+                                putInt(EXTRA_CLIPBOARD_TEXT_CHARS, snapshot.text.length)
+                                putBoolean(EXTRA_IS_CLIPBOARD_SENSITIVE, snapshot.sensitive)
+                            },
+                        )
                         finish(RESULT_OK, "ok")
                     }
                 }
+
                 ACTION_START_CLIPBOARD_OBSERVE -> {
                     val token = intent.getStringExtra(EXTRA_CLIPBOARD_SUBSCRIPTION_TOKEN).orEmpty()
                     val observing = startObserving(host, token)
                     if (observing) updateStatus(AsrkbClipboardSyncPhase.OBSERVING, host.name)
                     finish(if (observing) RESULT_OK else RESULT_CLIPBOARD_FAILED, if (observing) "observing" else "observe failed")
                 }
+
                 ACTION_STOP_CLIPBOARD_OBSERVE -> {
                     stopObserving(host)
                     activeHost?.let { updateStatus(AsrkbClipboardSyncPhase.CONNECTED, it.name) }
                     finish(RESULT_OK, "stopped")
                 }
+
                 else -> finish(RESULT_BAD_REQUEST, "unknown action")
             }
         }
 
         private fun finish(code: Int, message: String) {
-            setResultExtras((getResultExtras(true) ?: Bundle()).apply {
-                putString(EXTRA_TARGET_PACKAGE, appContext.packageName)
-                putBoolean(EXTRA_SUPPORTS_CLIPBOARD, true)
-                putString(EXTRA_MESSAGE, message)
-            })
+            setResultExtras(
+                (getResultExtras(true) ?: Bundle()).apply {
+                    putString(EXTRA_TARGET_PACKAGE, appContext.packageName)
+                    putBoolean(EXTRA_SUPPORTS_CLIPBOARD, true)
+                    putString(EXTRA_MESSAGE, message)
+                },
+            )
             resultCode = code
             resultData = message
         }
     }
 
-    private fun isEnabled(): Boolean =
-        preferences.getBoolean(ASRKB_CLIPBOARD_SYNC_ENABLED_KEY, false)
+    private fun isEnabled(): Boolean = preferences.getBoolean(ASRKB_CLIPBOARD_SYNC_ENABLED_KEY, false)
 
     @Synchronized
     private fun isHostAuthorized(host: Host): Boolean = isClipboardHostRequestAuthorized(

@@ -17,10 +17,10 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.Parcel
 import android.os.SystemClock
-import android.view.inputmethod.InputConnection
 import android.view.inputmethod.EditorInfo
-import androidx.lifecycle.lifecycleScope
+import android.view.inputmethod.InputConnection
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.osfans.trime.R
 import com.osfans.trime.data.prefs.AppPrefs
 import com.osfans.trime.ime.core.TrimeInputMethodService
@@ -43,6 +43,7 @@ object AsrkbSpeechClient {
     private var callbackBinder: IBinder? = null
     private var sessionId: Int = -1
     private var currentState: Int = STATE_IDLE
+
     @Volatile
     private var holding: Boolean = false
         set(value) {
@@ -109,67 +110,71 @@ object AsrkbSpeechClient {
                                     data: Parcel,
                                     reply: Parcel?,
                                     flags: Int,
-                                ): Boolean {
-                                    return try {
-                                        when (code) {
-                                            CB_onState -> {
-                                                data.enforceInterface(DESCRIPTOR_CB)
-                                                data.readInt()
-                                                val s = data.readInt()
-                                                data.readString()
-                                                currentState = s
-                                                reply?.writeNoException()
-                                                true
-                                            }
-                                            CB_onPartial -> {
-                                                data.enforceInterface(DESCRIPTOR_CB)
-                                                data.readInt()
-                                                val text = data.readString() ?: ""
-                                                ctx.lifecycleScope.launch {
-                                                    ctx.currentInputConnection?.setComposingText(text, 1)
-                                                }
-                                                reply?.writeNoException()
-                                                true
-                                            }
-                                            CB_onFinal -> {
-                                                data.enforceInterface(DESCRIPTOR_CB)
-                                                val callbackSessionId = data.readInt()
-                                                val text = data.readString() ?: ""
-                                                ctx.lifecycleScope.launch {
-                                                    ctx.commitText(text)
-                                                    startCorrectionObservation(ctx, callbackSessionId, text)
-                                                }
-                                                reply?.writeNoException()
-                                                true
-                                            }
-                                            CB_onError -> {
-                                                data.enforceInterface(DESCRIPTOR_CB)
-                                                data.readInt()
-                                                val codeVal = data.readInt()
-                                                val msg = data.readString()
-                                                toast(ctx, mapCallbackError(ctx, codeVal, msg))
-                                                unbind()
-                                                reply?.writeNoException()
-                                                true
-                                            }
-                                            CB_onAmplitude -> {
-                                                data.enforceInterface(DESCRIPTOR_CB)
-                                                data.readInt()
-                                                val amp = data.readFloat()
-                                                runCatching { VoiceOverlayUiBridge.onAmplitude?.invoke(amp) }
-                                                reply?.writeNoException()
-                                                true
-                                            }
-                                            IBinder.INTERFACE_TRANSACTION -> {
-                                                reply?.writeString(DESCRIPTOR_CB)
-                                                true
-                                            }
-                                            else -> super.onTransact(code, data, reply, flags)
+                                ): Boolean = try {
+                                    when (code) {
+                                        CB_ON_STATE -> {
+                                            data.enforceInterface(DESCRIPTOR_CB)
+                                            data.readInt()
+                                            val s = data.readInt()
+                                            data.readString()
+                                            currentState = s
+                                            reply?.writeNoException()
+                                            true
                                         }
-                                    } catch (t: Throwable) {
-                                        Timber.w(t, "callback transact handle failed (code=$code)")
-                                        false
+
+                                        CB_ON_PARTIAL -> {
+                                            data.enforceInterface(DESCRIPTOR_CB)
+                                            data.readInt()
+                                            val text = data.readString() ?: ""
+                                            ctx.lifecycleScope.launch {
+                                                ctx.currentInputConnection?.setComposingText(text, 1)
+                                            }
+                                            reply?.writeNoException()
+                                            true
+                                        }
+
+                                        CB_ON_FINAL -> {
+                                            data.enforceInterface(DESCRIPTOR_CB)
+                                            val callbackSessionId = data.readInt()
+                                            val text = data.readString() ?: ""
+                                            ctx.lifecycleScope.launch {
+                                                ctx.commitText(text)
+                                                startCorrectionObservation(ctx, callbackSessionId, text)
+                                            }
+                                            reply?.writeNoException()
+                                            true
+                                        }
+
+                                        CB_ON_ERROR -> {
+                                            data.enforceInterface(DESCRIPTOR_CB)
+                                            data.readInt()
+                                            val codeVal = data.readInt()
+                                            val msg = data.readString()
+                                            toast(ctx, mapCallbackError(ctx, codeVal, msg))
+                                            unbind()
+                                            reply?.writeNoException()
+                                            true
+                                        }
+
+                                        CB_ON_AMPLITUDE -> {
+                                            data.enforceInterface(DESCRIPTOR_CB)
+                                            data.readInt()
+                                            val amp = data.readFloat()
+                                            runCatching { VoiceOverlayUiBridge.onAmplitude?.invoke(amp) }
+                                            reply?.writeNoException()
+                                            true
+                                        }
+
+                                        IBinder.INTERFACE_TRANSACTION -> {
+                                            reply?.writeString(DESCRIPTOR_CB)
+                                            true
+                                        }
+
+                                        else -> super.onTransact(code, data, reply, flags)
                                     }
+                                } catch (t: Throwable) {
+                                    Timber.w(t, "callback transact handle failed (code=$code)")
+                                    false
                                 }
                             }
                         callbackBinder = cbBinder
@@ -182,7 +187,7 @@ object AsrkbSpeechClient {
                             // push PCM mode: presence=0 means no SpeechConfig; server follows its current settings
                             data.writeInt(0)
                             data.writeStrongBinder(cbBinder)
-                            b.transact(TRANSACTION_startPcmSession, data, reply, 0)
+                            b.transact(TRANSACTION_START_PCM_SESSION, data, reply, 0)
                             reply.readException()
                             sid = reply.readInt()
                         } finally {
@@ -222,13 +227,13 @@ object AsrkbSpeechClient {
                                                 token = token,
                                                 requirements = requirements,
                                                 inputType = inputType,
-                                                imeOptions = imeOptions
+                                                imeOptions = imeOptions,
                                             )?.also { negotiatedContext = it } != null
                                         }
                                     },
                                     continueOriginalAsr = {
                                         if (negotiationGate.isCurrent(token)) startAudioStreaming(ctx)
-                                    }
+                                    },
                                 )
                                 if (negotiationGate.isCurrent(token)) {
                                     initialInputContext = negotiatedContext
@@ -340,7 +345,7 @@ object AsrkbSpeechClient {
         try {
             data.writeInterfaceToken(DESCRIPTOR_SVC)
             data.writeInt(sid)
-            b.transact(TRANSACTION_finishPcm, data, reply, 0)
+            b.transact(TRANSACTION_FINISH_PCM, data, reply, 0)
             reply.readException()
         } catch (t: Throwable) {
             Timber.w(t, "finishPcmSession failed")
@@ -371,7 +376,7 @@ object AsrkbSpeechClient {
         try {
             data.writeInterfaceToken(DESCRIPTOR_SVC)
             data.writeInt(sid)
-            b.transact(TRANSACTION_cancelSession, data, reply, 0)
+            b.transact(TRANSACTION_CANCEL_SESSION, data, reply, 0)
             reply.readException()
         } catch (t: Throwable) {
             Timber.w(t, "cancelSession failed")
@@ -408,10 +413,8 @@ object AsrkbSpeechClient {
         initialInputContext = null
     }
 
-    private fun queryInputRequirements(binder: IBinder, sid: Int): Int? {
-        return optionalTransactionInt(binder, TRANSACTION_getInputRequirements) { data ->
-            data.writeInt(sid)
-        }
+    private fun queryInputRequirements(binder: IBinder, sid: Int): Int? = optionalTransactionInt(binder, TRANSACTION_GET_INPUT_REQUIREMENTS) { data ->
+        data.writeInt(sid)
     }
 
     private fun attachInputContextIfRequested(
@@ -419,13 +422,13 @@ object AsrkbSpeechClient {
         token: AsrkbNegotiationToken,
         requirements: Int,
         inputType: Int,
-        imeOptions: Int
+        imeOptions: Int,
     ): AsrkbCursorSnapshot? {
         if (requirements == 0 || !negotiationGate.isCurrent(token)) return null
         val connection = token.connection as? InputConnection ?: return null
         val inputContext = captureInputContext(connection) ?: return null
         if (!negotiationGate.isCurrent(token)) return null
-        val attached = optionalTransactionInt(binder, TRANSACTION_setInputContext) { data ->
+        val attached = optionalTransactionInt(binder, TRANSACTION_SET_INPUT_CONTEXT) { data ->
             data.writeInt(token.sessionId)
             data.writeLong(token.generation)
             data.writeInt(inputType)
@@ -439,7 +442,7 @@ object AsrkbSpeechClient {
     private fun startCorrectionObservation(
         service: TrimeInputMethodService,
         callbackSessionId: Int,
-        finalText: String
+        finalText: String,
     ) {
         stopAudioStreaming()
         runCatching { VoiceOverlayUiBridge.onDone?.invoke() }
@@ -468,7 +471,7 @@ object AsrkbSpeechClient {
                     initial = initial,
                     finalText = finalText,
                     committed = committed,
-                    nowMs = SystemClock.uptimeMillis()
+                    nowMs = SystemClock.uptimeMillis(),
                 )
             ) {
                 unbind(clearUi = false)
@@ -496,7 +499,7 @@ object AsrkbSpeechClient {
                 val report = correctionTracker.update(
                     generation = sessionEditorGeneration,
                     snapshot = snapshot,
-                    nowMs = SystemClock.uptimeMillis()
+                    nowMs = SystemClock.uptimeMillis(),
                 ) ?: continue
                 if (!dispatchEditReport(report)) unbind(clearUi = false)
                 return@launch
@@ -516,7 +519,7 @@ object AsrkbSpeechClient {
 
     internal fun onStartInput(
         info: EditorInfo,
-        restarting: Boolean
+        restarting: Boolean,
     ) {
         val previous = editorGeneration.currentGeneration
         val current = editorGeneration.onStartInput(info.asAsrkbEditorIdentity(), restarting)
@@ -568,7 +571,7 @@ object AsrkbSpeechClient {
             val report = correctionTracker.update(
                 generation = generation,
                 snapshot = snapshot,
-                nowMs = SystemClock.uptimeMillis()
+                nowMs = SystemClock.uptimeMillis(),
             ) ?: return@launch
             reportEdit(binder, report)
             withContext(Dispatchers.Main) { unbind(clearUi = false) }
@@ -577,7 +580,7 @@ object AsrkbSpeechClient {
 
     private fun dispatchEditReport(
         report: AsrkbCorrectionReport,
-        afterUnbind: () -> Unit = {}
+        afterUnbind: () -> Unit = {},
     ): Boolean {
         val binder = remote ?: return false
         val scope = ctxRef?.lifecycleScope ?: return false
@@ -590,13 +593,13 @@ object AsrkbSpeechClient {
                     if (remote === binder) unbind(clearUi = false)
                     afterUnbind()
                 }
-            }
+            },
         )
         return true
     }
 
     private fun reportEdit(binder: IBinder, report: AsrkbCorrectionReport) {
-        val result = optionalTransactionInt(binder, TRANSACTION_reportEdit) { data ->
+        val result = optionalTransactionInt(binder, TRANSACTION_REPORT_EDIT) { data ->
             data.writeInt(report.sessionId)
             data.writeLong(report.generation)
             data.writeString(report.snapshot.beforeCursor)
@@ -616,7 +619,7 @@ object AsrkbSpeechClient {
         packageName = packageName.orEmpty(),
         fieldId = fieldId,
         inputType = inputType,
-        imeOptions = imeOptions
+        imeOptions = imeOptions,
     )
 
     private fun captureInputContext(connection: InputConnection): AsrkbCursorSnapshot? {
@@ -635,7 +638,7 @@ object AsrkbSpeechClient {
     private inline fun optionalTransactionInt(
         binder: IBinder,
         code: Int,
-        fill: (Parcel) -> Unit
+        fill: (Parcel) -> Unit,
     ): Int? {
         val data = Parcel.obtain()
         val reply = Parcel.obtain()
@@ -852,7 +855,7 @@ object AsrkbSpeechClient {
             }
             data.writeInt(sr)
             data.writeInt(ch)
-            b.transact(TRANSACTION_writePcm, data, reply, 0)
+            b.transact(TRANSACTION_WRITE_PCM, data, reply, 0)
             reply.readException()
         } catch (t: Throwable) {
             Timber.w(t, "writePcm transact failed")
@@ -880,42 +883,38 @@ object AsrkbSpeechClient {
         }
     }
 
-    private fun mapStartError(ctx: Context, code: Int): String {
-        return when (code) {
-            -2 -> ctx.getString(R.string.asrkb_err_busy)
-            -3 -> ctx.getString(R.string.asrkb_err_feature_disabled)
-            -5 -> ctx.getString(R.string.asrkb_err_unsupported)
-            else -> ctx.getString(R.string.asrkb_err_start_failed_with_code, code)
-        }
+    private fun mapStartError(ctx: Context, code: Int): String = when (code) {
+        -2 -> ctx.getString(R.string.asrkb_err_busy)
+        -3 -> ctx.getString(R.string.asrkb_err_feature_disabled)
+        -5 -> ctx.getString(R.string.asrkb_err_unsupported)
+        else -> ctx.getString(R.string.asrkb_err_start_failed_with_code, code)
     }
 
-    private fun mapCallbackError(ctx: Context, code: Int, msg: String?): String {
-        return when (code) {
-            403 -> ctx.getString(R.string.asrkb_err_feature_disabled)
-            else -> ctx.getString(R.string.asrkb_err_service_error_with_code, code)
-        }.let { base ->
-            if (msg.isNullOrBlank()) base else "$base: $msg"
-        }
+    private fun mapCallbackError(ctx: Context, code: Int, msg: String?): String = when (code) {
+        403 -> ctx.getString(R.string.asrkb_err_feature_disabled)
+        else -> ctx.getString(R.string.asrkb_err_service_error_with_code, code)
+    }.let { base ->
+        if (msg.isNullOrBlank()) base else "$base: $msg"
     }
 
     private const val DESCRIPTOR_SVC = "com.brycewg.asrkb.aidl.IExternalSpeechService"
-    private const val TRANSACTION_cancelSession = IBinder.FIRST_CALL_TRANSACTION + 2
-    private const val TRANSACTION_startPcmSession = IBinder.FIRST_CALL_TRANSACTION + 6
-    private const val TRANSACTION_writePcm = IBinder.FIRST_CALL_TRANSACTION + 7
-    private const val TRANSACTION_finishPcm = IBinder.FIRST_CALL_TRANSACTION + 8
-    private const val TRANSACTION_getInputRequirements = IBinder.FIRST_CALL_TRANSACTION + 9
-    private const val TRANSACTION_setInputContext = IBinder.FIRST_CALL_TRANSACTION + 10
-    private const val TRANSACTION_reportEdit = IBinder.FIRST_CALL_TRANSACTION + 11
+    private const val TRANSACTION_CANCEL_SESSION = IBinder.FIRST_CALL_TRANSACTION + 2
+    private const val TRANSACTION_START_PCM_SESSION = IBinder.FIRST_CALL_TRANSACTION + 6
+    private const val TRANSACTION_WRITE_PCM = IBinder.FIRST_CALL_TRANSACTION + 7
+    private const val TRANSACTION_FINISH_PCM = IBinder.FIRST_CALL_TRANSACTION + 8
+    private const val TRANSACTION_GET_INPUT_REQUIREMENTS = IBinder.FIRST_CALL_TRANSACTION + 9
+    private const val TRANSACTION_SET_INPUT_CONTEXT = IBinder.FIRST_CALL_TRANSACTION + 10
+    private const val TRANSACTION_REPORT_EDIT = IBinder.FIRST_CALL_TRANSACTION + 11
 
     private const val COMMIT_VERIFY_DELAY_MS = 40L
     private const val CORRECTION_POLL_MS = 1_000L
 
     private const val DESCRIPTOR_CB = "com.brycewg.asrkb.aidl.ISpeechCallback"
-    private const val CB_onState = IBinder.FIRST_CALL_TRANSACTION + 0
-    private const val CB_onPartial = IBinder.FIRST_CALL_TRANSACTION + 1
-    private const val CB_onFinal = IBinder.FIRST_CALL_TRANSACTION + 2
-    private const val CB_onError = IBinder.FIRST_CALL_TRANSACTION + 3
-    private const val CB_onAmplitude = IBinder.FIRST_CALL_TRANSACTION + 4
+    private const val CB_ON_STATE = IBinder.FIRST_CALL_TRANSACTION + 0
+    private const val CB_ON_PARTIAL = IBinder.FIRST_CALL_TRANSACTION + 1
+    private const val CB_ON_FINAL = IBinder.FIRST_CALL_TRANSACTION + 2
+    private const val CB_ON_ERROR = IBinder.FIRST_CALL_TRANSACTION + 3
+    private const val CB_ON_AMPLITUDE = IBinder.FIRST_CALL_TRANSACTION + 4
 
     private const val STATE_IDLE = 0
     private const val STATE_RECORDING = 1

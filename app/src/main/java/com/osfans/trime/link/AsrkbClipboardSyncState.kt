@@ -38,24 +38,20 @@ internal data class AsrkbClipboardSyncStatus(
     }
 }
 
-internal fun statusAfterWindowHidden(status: AsrkbClipboardSyncStatus): AsrkbClipboardSyncStatus =
-    when (status.phase) {
-        AsrkbClipboardSyncPhase.CONNECTING ->
-            AsrkbClipboardSyncStatus(AsrkbClipboardSyncPhase.WAITING)
-        else -> status
-    }
+internal fun statusAfterWindowHidden(status: AsrkbClipboardSyncStatus): AsrkbClipboardSyncStatus = when (status.phase) {
+    AsrkbClipboardSyncPhase.CONNECTING ->
+        AsrkbClipboardSyncStatus(AsrkbClipboardSyncPhase.WAITING)
 
-internal fun hasQueuedReconnect(phase: AsrkbClipboardSyncPhase): Boolean =
-    phase == AsrkbClipboardSyncPhase.RECONNECTING
+    else -> status
+}
 
-internal fun shouldReactivateSession(binderAlive: Boolean, sessionId: String?): Boolean =
-    binderAlive && sessionId != null
+internal fun hasQueuedReconnect(phase: AsrkbClipboardSyncPhase): Boolean = phase == AsrkbClipboardSyncPhase.RECONNECTING
 
-internal fun phaseAfterConnectionLoss(enabled: Boolean): AsrkbClipboardSyncPhase =
-    if (enabled) AsrkbClipboardSyncPhase.RECONNECTING else AsrkbClipboardSyncPhase.DISABLED
+internal fun shouldReactivateSession(binderAlive: Boolean, sessionId: String?): Boolean = binderAlive && sessionId != null
 
-internal fun activeSessionPhase(isObserving: Boolean): AsrkbClipboardSyncPhase =
-    if (isObserving) AsrkbClipboardSyncPhase.OBSERVING else AsrkbClipboardSyncPhase.CONNECTED
+internal fun phaseAfterConnectionLoss(enabled: Boolean): AsrkbClipboardSyncPhase = if (enabled) AsrkbClipboardSyncPhase.RECONNECTING else AsrkbClipboardSyncPhase.DISABLED
+
+internal fun activeSessionPhase(isObserving: Boolean): AsrkbClipboardSyncPhase = if (isObserving) AsrkbClipboardSyncPhase.OBSERVING else AsrkbClipboardSyncPhase.CONNECTED
 
 internal fun isClipboardHostRequestAuthorized(
     enabled: Boolean,

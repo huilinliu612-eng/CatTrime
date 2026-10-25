@@ -60,14 +60,21 @@ class ClipboardSettingsFragment : PreferenceDelegateFragment(AppPrefs.defaultIns
         )
         statusPreference.summary = when (status.phase) {
             AsrkbClipboardSyncPhase.STOPPED -> getString(R.string.asrkb_clipboard_sync_status_stopped)
+
             AsrkbClipboardSyncPhase.DISABLED -> getString(R.string.asrkb_clipboard_sync_status_stopped)
+
             AsrkbClipboardSyncPhase.WAITING -> getString(R.string.asrkb_clipboard_sync_status_waiting)
+
             AsrkbClipboardSyncPhase.CONNECTING -> getString(R.string.asrkb_clipboard_sync_status_connecting)
+
             AsrkbClipboardSyncPhase.RECONNECTING -> getString(R.string.asrkb_clipboard_sync_status_reconnecting)
+
             AsrkbClipboardSyncPhase.CONNECTED ->
                 getString(R.string.asrkb_clipboard_sync_status_connected, status.detail)
+
             AsrkbClipboardSyncPhase.OBSERVING ->
                 getString(R.string.asrkb_clipboard_sync_status_observing, status.detail)
+
             AsrkbClipboardSyncPhase.ERROR ->
                 getString(R.string.asrkb_clipboard_sync_status_error, status.detail)
         }
@@ -78,13 +85,15 @@ class ClipboardSettingsFragment : PreferenceDelegateFragment(AppPrefs.defaultIns
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.asrkb_clipboard_sync_enabled)
             .setMessage(
-                if (enabled) R.string.asrkb_clipboard_sync_enabled_summary
-                else R.string.asrkb_clipboard_sync_disabled_notice,
+                if (enabled) {
+                    R.string.asrkb_clipboard_sync_enabled_summary
+                } else {
+                    R.string.asrkb_clipboard_sync_disabled_notice
+                },
             )
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }
 
-    private fun preferences(): SharedPreferences =
-        PreferenceManager.getDefaultSharedPreferences(requireContext())
+    private fun preferences(): SharedPreferences = PreferenceManager.getDefaultSharedPreferences(requireContext())
 }
