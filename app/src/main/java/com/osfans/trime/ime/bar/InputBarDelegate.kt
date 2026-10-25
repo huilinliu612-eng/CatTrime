@@ -69,6 +69,7 @@ class InputBarDelegate(override val di: DI) :
     private val scope: ThemeScope by instance()
     private val theme: Theme get() = scope.theme
     private val windowManager: BoardWindowManager by instance()
+    private val keyboardWindow: KeyboardWindow by instance()
     private val commonKeyboardActionListener: CommonKeyboardActionListener by instance()
     private val candidate: CompactCandidateDelegate by instance()
     private val rime: RimeSession by instance()

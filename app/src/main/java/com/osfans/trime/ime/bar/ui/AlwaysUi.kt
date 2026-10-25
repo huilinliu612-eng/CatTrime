@@ -76,6 +76,12 @@ class AlwaysUi(
         ToolButton(ctx, R.drawable.ic_baseline_mic_24, scope).apply {
             visibility = View.GONE
         }
+
+    private val rightButtonAnimator =
+        ViewAnimator(ctx).apply {
+            add(hideKeyboardButton, lParams(matchParent, matchParent))
+            buttonsUi.firstButton?.let { add(it, lParams(matchParent, matchParent)) }
+        }
     private val rightMostButton =
         ViewAnimator(ctx).apply {
             add(hideKeyboardButton, lParams(matchParent, matchParent))
