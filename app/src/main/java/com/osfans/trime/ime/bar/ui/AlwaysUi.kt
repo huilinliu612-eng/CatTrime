@@ -76,7 +76,9 @@ class AlwaysUi(
     /** 说点啥 AIDL 语音输入工具栏按钮：点按开始录音，再次点按停止并上屏。 */
     val asrkbVoiceButton =
         ToolButton(ctx, R.drawable.ic_baseline_mic_24).apply {
-            visibility = View.GONE
+            // 用 INVISIBLE 而非 GONE：始终占据工具栏最右一格，
+            // 避免 animator 区域扩展到它下面而与主题自定义按钮重叠。
+            visibility = View.INVISIBLE
         }
     private val rightMostButton =
         ViewAnimator(ctx).apply {
@@ -138,19 +140,20 @@ class AlwaysUi(
                 centerVertically()
             },
         )
+        // 语音按钮固定占据工具栏最右侧一格。它默认 INVISIBLE，始终参与布局，
+        // 这样 rightMostButton 与 animator 的右边界都能稳定地排在它左边，
+        // 不会覆盖或挤压主题自定义的工具栏按钮。
         add(
-            rightMostButton,
+            asrkbVoiceButton,
             lParams(rightWidth, rightHeight) {
                 endOfParent()
                 centerVertically()
             },
         )
-        // 语音按钮排在 rightMostButton 左侧：endToStart=rightMostButton。
-        // 它 GONE 时 ConstraintLayout 会忽略约束，不占位也不会影响 rightMostButton。
         add(
-            asrkbVoiceButton,
+            rightMostButton,
             lParams(rightWidth, rightHeight) {
-                endToStartOf(rightMostButton)
+                endToStartOf(asrkbVoiceButton)
                 centerVertically()
             },
         )

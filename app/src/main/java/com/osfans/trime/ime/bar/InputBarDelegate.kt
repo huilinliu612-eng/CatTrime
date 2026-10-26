@@ -122,9 +122,13 @@ class InputBarDelegate : InputBroadcastReceiver {
      */
     fun refreshAsrkbVoiceButton(button: ToolButton = alwaysUi.asrkbVoiceButton) {
         if (!isAsrkbVoiceButtonEnabled()) {
+            // 功能关闭：真正移除占位（GONE）。此时 rightMostButton 的约束
+            // endToStartOf(asrkbVoiceButton) 会塌缩回父容器右边，与原版一致。
             button.visibility = View.GONE
             return
         }
+        // 功能开启但处于空闲态：仍用 INVISIBLE 占位，保证 animator 区域
+        // 不会扩展到语音按钮下方，从而不遮挡主题自定义的工具栏按钮。
         button.visibility = View.VISIBLE
         button.setIcon(
             if (AsrkbSpeechClient.isHolding()) {
