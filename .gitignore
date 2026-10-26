@@ -494,3 +494,8 @@ app/src/main/jni/boost/
 # kotlin
 .kotlin
 
+
+# 同步脚本的 GitHub token（绝不能进仓库）
+token.txt
+trime_sync/token.txt
+**/token.txt
