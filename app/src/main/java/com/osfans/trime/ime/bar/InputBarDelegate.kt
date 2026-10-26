@@ -37,6 +37,7 @@ import com.osfans.trime.ime.bar.ui.TabUi
 import com.osfans.trime.ime.broadcast.InputBroadcastReceiver
 import com.osfans.trime.ime.candidates.compact.CompactCandidateDelegate
 import com.osfans.trime.ime.candidates.unrolled.window.FlexboxUnrolledCandidateWindow
+import com.osfans.trime.ime.bar.ui.ToolButton
 import com.osfans.trime.ime.core.TrimeInputMethodService
 import com.osfans.trime.ime.dependency.InputDependencyManager
 import com.osfans.trime.ime.keyboard.CommonKeyboardActionListener
@@ -119,8 +120,7 @@ class InputBarDelegate : InputBroadcastReceiver {
      * 注意：这段逻辑必须在“每次键盘显示”与“设置变更”时都调用，
      * 不能只在 AlwaysUi 初始化时计算一次，否则用户后开关设置时图标永远不会出现。
      */
-    fun refreshAsrkbVoiceButton() {
-        val button = alwaysUi.asrkbVoiceButton
+    fun refreshAsrkbVoiceButton(button: ToolButton = alwaysUi.asrkbVoiceButton) {
         if (!isAsrkbVoiceButtonEnabled()) {
             button.visibility = View.GONE
             return
@@ -197,7 +197,7 @@ class InputBarDelegate : InputBroadcastReceiver {
                 onSwipe = swipeDownHideKeyboardCallback
             }
             asrkbVoiceButton.apply {
-                refreshAsrkbVoiceButton()
+                refreshAsrkbVoiceButton(this)
                 setOnClickListener {
                     if (AsrkbSpeechClient.isHolding()) {
                         stopAsrkbVoiceFromToolbar()

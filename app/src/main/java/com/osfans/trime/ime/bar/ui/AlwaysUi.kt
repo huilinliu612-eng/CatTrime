@@ -20,6 +20,7 @@ import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
+import splitties.views.dsl.constraintlayout.endToStartOf
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
@@ -144,14 +145,13 @@ class AlwaysUi(
                 centerVertically()
             },
         )
-        // 语音按钮放在最右按钮左侧：靠 marginEnd 偏移定位。
-        // 它 GONE 时不占位，也不会把 rightMostButton 挤到同一坐标造成重叠。
+        // 语音按钮排在 rightMostButton 左侧：endToStart=rightMostButton。
+        // 它 GONE 时 ConstraintLayout 会忽略约束，不占位也不会影响 rightMostButton。
         add(
             asrkbVoiceButton,
             lParams(rightWidth, rightHeight) {
-                endOfParent()
+                endToStartOf(rightMostButton)
                 centerVertically()
-                marginEnd = rightWidth
             },
         )
         add(
