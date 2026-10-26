@@ -1,0 +1,139 @@
+# SPDX-FileCopyrightText: 2015 - 2024 Rime community
+#
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: Build APK (ASRKB Voice)
+
+on:
+  push:
+    branches:
+      - 'feature/asrkb-voice-port'
+      - 'newui-voice'
+    paths-ignore:
+      - '**.md'
+      - 'doc/**'
+  workflow_dispatch:
+    inputs:
+      abi:
+        description: 'Target ABI'
+        required: false
+        default: 'arm64-v8a'
+        type: choice
+        options:
+          - arm64-v8a
+          - armeabi-v7a
+          - x86_64
+          - universal
+
+env:
+  CI_NAME: ASRKB Voice Build
+  ABI: ${{ github.event.inputs.abi || 'arm64-v8a' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Fetch source code
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Get branch name
+        id: vars
+        shell: bash
+        run: |
+          echo ${GITHUB_REF#refs/*/}
+          echo CI_BRANCH=${GITHUB_REF#refs/*/} >> $GITHUB_ENV
+          # artifact/release 名称不能含 /，这里做一次净化
+          echo CI_BRANCH_SAFE=$(echo "${GITHUB_REF#refs/*/}" | tr '/' '-') >> $GITHUB_ENV
+
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: "temurin"
+          java-version: 25
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: Install CMake
+        run: |
+          sdkmanager --install "cmake;3.31.6"
+
+      - name: Fetch submodules
+        run: |
+          git submodule update --init --recursive
+
+      - name: Build debug Trime
+        env:
+          BUILD_ABI: ${{ github.event.inputs.abi == 'universal' && 'armeabi-v7a,arm64-v8a,x86,x86_64' || github.event.inputs.abi || 'arm64-v8a' }}
+        run: |
+          make debug
+
+      - name: Show build outputs
+        if: always()
+        run: |
+          ls -lh app/build/outputs/apk/debug/ || true
+
+      - name: Rename APK
+        id: rename
+        run: |
+          set -e
+          mkdir -p dist
+          shopt -s nullglob
+          found=0
+          for f in app/build/outputs/apk/debug/*.apk; do
+            base=$(basename "$f")
+            cp "$f" "dist/${base}"
+            found=1
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "::error::No APK produced"
+            exit 1
+          fi
+          ls -lh dist/
+          echo "apk_count=$(ls -1 dist/*.apk | wc -l)" >> $GITHUB_OUTPUT
+          echo "version=$(grep -m1 'versionName' app/build.gradle.kts | sed 's/.*= *"\(.*\)".*/\1/' || echo dev)" >> $GITHUB_OUTPUT
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: trime-asrkb-${{ env.CI_BRANCH_SAFE }}-${{ github.sha }}
+          path: dist/*.apk
+          retention-days: 90
+
+      - name: Create Release
+        if: ${{ github.event_name == 'push' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: asrkb-build-${{ github.run_number }}
+          name: "ASRKB Voice Build #${{ github.run_number }}"
+          body: |
+            ## CatTrime + ASRKB 语音联动版
+
+            自动构建自分支 `${{ env.CI_BRANCH }}`
+            提交: ${{ github.sha }}
+
+            ### 功能
+            - 「说点啥」BiBi Keyboard AIDL 语音输入
+            - 长按键触发录音，松开提交
+            - 工具栏麦克风按钮
+            - 实时音频波形
+            - 剪贴板同步
+
+            ### 使用前提
+            1. 安装「说点啥」BiBi Keyboard
+            2. 在其设置中开启「允许外部输入法联动 AIDL」
+            3. 在 CatTrime 设置 → 常规 → 开启「与说点啥联动」
+            4. 长按空格键（或配置了 Voice Assist 的键）开始录音
+
+            > 这是 debug 签名的测试包，仅供试用。
+          files: dist/*.apk
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
