@@ -68,16 +68,16 @@ jobs:
         run: |
           git submodule update --init --recursive
 
-      - name: Build debug Trime
+      - name: Build release Trime (signed with project signing/release.keystore)
         env:
           BUILD_ABI: ${{ github.event.inputs.abi == 'universal' && 'armeabi-v7a,arm64-v8a,x86,x86_64' || github.event.inputs.abi || 'arm64-v8a' }}
         run: |
-          make debug
+          make release
 
       - name: Show build outputs
         if: always()
         run: |
-          ls -lh app/build/outputs/apk/debug/ || true
+          ls -lh app/build/outputs/apk/release/ || true
 
       - name: Rename APK
         id: rename
@@ -86,7 +86,7 @@ jobs:
           mkdir -p dist
           shopt -s nullglob
           found=0
-          for f in app/build/outputs/apk/debug/*.apk; do
+          for f in app/build/outputs/apk/release/*.apk; do
             base=$(basename "$f")
             cp "$f" "dist/${base}"
             found=1
@@ -131,7 +131,7 @@ jobs:
             3. 在 CatTrime 设置 → 常规 → 开启「与说点啥联动」
             4. 长按空格键（或配置了 Voice Assist 的键）开始录音
 
-            > 这是 debug 签名的测试包，仅供试用。
+            > 这是正式签名（项目内置测试密钥）的 release 包，仅供试用。
           files: dist/*.apk
           draft: false
           prerelease: true

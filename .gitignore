@@ -33,6 +33,7 @@ render.experimental.xml
 # Keystore files
 *.jks
 *.keystore
+!signing/release.keystore
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json
@@ -469,9 +470,11 @@ obj/
 ### Custom ###
 # Keystore
 keystore.properties
+!keystore.properties
 # `*.keystore` above does not match the suffixes AGP writes next to the key
 # (`debug.keystore.generated-backup`, `.lock`), and those hold the key itself.
 *.keystore*
+!signing/release.keystore
 
 # 本地开发环境 —— 绝不入库：
 # 前两个是本机构建/签名用的 home，`.workbuddy/` 是本项目的开发笔记与截图。
