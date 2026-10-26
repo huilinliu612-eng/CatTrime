@@ -33,9 +33,9 @@ import timber.log.Timber
 class AlwaysUi(
     override val ctx: Context,
     private val theme: Theme,
-    private val onButtonClick: ((String) -> Unit)? = null,
     /** 语音按钮在工具栏序列中的位置：0 = 最右（所有主题按钮之后），N = 第 N 个主题按钮之前。 */
     asrkbVoicePosition: Int = 0,
+    private val onButtonClick: ((String) -> Unit)? = null,
 ) : Ui {
     enum class State {
         Toolbar,
