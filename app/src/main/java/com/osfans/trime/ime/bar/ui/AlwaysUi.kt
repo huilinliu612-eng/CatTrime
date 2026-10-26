@@ -20,7 +20,6 @@ import splitties.views.dsl.constraintlayout.before
 import splitties.views.dsl.constraintlayout.centerVertically
 import splitties.views.dsl.constraintlayout.constraintLayout
 import splitties.views.dsl.constraintlayout.endOfParent
-import splitties.views.dsl.constraintlayout.endToStartOf
 import splitties.views.dsl.constraintlayout.lParams
 import splitties.views.dsl.constraintlayout.matchConstraints
 import splitties.views.dsl.constraintlayout.startOfParent
@@ -35,6 +34,8 @@ class AlwaysUi(
     override val ctx: Context,
     private val theme: Theme,
     private val onButtonClick: ((String) -> Unit)? = null,
+    /** 语音按钮在工具栏序列中的位置：0 = 最右（所有主题按钮之后），N = 第 N 个主题按钮之前。 */
+    asrkbVoicePosition: Int = 0,
 ) : Ui {
     enum class State {
         Toolbar,
@@ -65,7 +66,6 @@ class AlwaysUi(
         }
     }
 
-    val buttonsUi = ButtonsBarUi(ctx, theme, onButtonClick)
 
     val clipboardUi = ClipboardSuggestionUi(ctx)
 
@@ -73,13 +73,29 @@ class AlwaysUi(
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24)
 
-    /** 说点啥 AIDL 语音输入工具栏按钮：点按开始录音，再次点按停止并上屏。 */
+    /**
+     * 说点啥 AIDL 语音输入工具栏按钮：点按开始录音，再次点按停止并上屏。
+     *
+     * 该按钮已并入 [ButtonsBarUi] 的按钮序列，位置由设置项「麦克风按钮位置」决定，
+     * 与主题按钮一起参与 flex 布局，故不会覆盖或挤压任何主题按钮。
+     */
     val asrkbVoiceButton =
         ToolButton(ctx, R.drawable.ic_baseline_mic_24).apply {
-            // 用 INVISIBLE 而非 GONE：始终占据工具栏最右一格，
-            // 避免 animator 区域扩展到它下面而与主题自定义按钮重叠。
-            visibility = View.INVISIBLE
+            // 初始隐藏，等 InputBarDelegate 根据设置决定是否显示
+            visibility = View.GONE
         }
+
+    /**
+     * 工具栏按钮区。必须在 [asrkbVoiceButton] 之后构造，因为构造时要把语音按钮
+     * 注入到按钮序列中，位置由 [asrkbVoicePosition] 决定。
+     */
+    val buttonsUi = ButtonsBarUi(ctx, theme, onButtonClick).apply {
+        attachAsrkbVoiceButton(asrkbVoiceButton, asrkbVoicePosition)
+    }
+
+    /**
+     * 工具栏最右侧的按钮槽位：收起键盘按钮 + 主题的第 1 个按钮。
+     */
     private val rightMostButton =
         ViewAnimator(ctx).apply {
             add(hideKeyboardButton, lParams(matchParent, matchParent))
@@ -140,20 +156,13 @@ class AlwaysUi(
                 centerVertically()
             },
         )
-        // 语音按钮固定占据工具栏最右侧一格。它默认 INVISIBLE，始终参与布局，
-        // 这样 rightMostButton 与 animator 的右边界都能稳定地排在它左边，
-        // 不会覆盖或挤压主题自定义的工具栏按钮。
-        add(
-            asrkbVoiceButton,
-            lParams(rightWidth, rightHeight) {
-                endOfParent()
-                centerVertically()
-            },
-        )
+        // 语音按钮现在位于 buttonsUi 的按钮序列内（见 ButtonsBarUi.attachAsrkbVoiceButton），
+        // 不再占用 ConstraintLayout 的独立格子，rightMostButton 直接贴父容器右边，
+        // 与上游原版行为一致。
         add(
             rightMostButton,
             lParams(rightWidth, rightHeight) {
-                endToStartOf(asrkbVoiceButton)
+                endOfParent()
                 centerVertically()
             },
         )

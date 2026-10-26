@@ -303,6 +303,9 @@
     <string name="asrkb_duck_media_on_record_summary">使用说点啥语音输入录音时，请求其他应用暂时降低音量或暂停播放。实际效果取决于系统和播放应用。</string>
     <string name="asrkb_aidl_voice_toolbar_button">工具栏麦克风按钮</string>
     <string name="asrkb_aidl_voice_toolbar_button_summary">在工具栏显示麦克风按钮：点按开始录音，再次点按停止并上屏。开关切换后如未立即生效，请在键盘样式中切换到其他主题再切换回来以刷新 UI。</string>
+    <string name="asrkb_voice_button_position">麦克风按钮位置</string>
+    <string name="asrkb_voice_button_position_end">最右侧（所有按钮之后）</string>
+    <string name="asrkb_voice_button_position_before">第 %1$d 个按钮之前</string>
     <string name="asrkb_clipboard_sync_enabled">启用说点啥粘贴板同步</string>
     <string name="asrkb_clipboard_sync_enabled_summary">本输入法活动时连接说点啥，并使用本体的 SyncClipboard 配置。还需在说点啥中启用剪贴板同步。</string>
     <string name="asrkb_clipboard_sync_disabled_notice">本输入法的剪贴板变化将不再同步到说点啥。</string>

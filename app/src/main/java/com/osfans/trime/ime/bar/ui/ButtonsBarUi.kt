@@ -57,10 +57,27 @@ class ButtonsBarUi(
         }
     }
 
+    /**
+     * 语音按钮插入位置（视觉顺序）：0 = 所有主题按钮之后（最右），N = 第 N 个主题按钮之前。
+     */
+    private var asrkbVoiceIndex: Int = 0
+
+    private var asrkbVoiceButtonView: ToolButton? = null
+
+    /**
+     * 注册语音按钮实例。真正的插入由 [insertAsrkbVoiceButton] 完成。
+     *
+     * 复用 [AlwaysUi] 里的同一个 [ToolButton] 实例（点击回调与图标状态都绑在它上面），
+     * 避免出现两份状态导致图标不同步。
+     */
+    fun attachAsrkbVoiceButton(button: ToolButton, visualIndex: Int) {
+        asrkbVoiceButtonView = button
+        asrkbVoiceIndex = visualIndex
+    }
+
     init {
         val buttons = theme.toolBar.buttons
         firstButton = buttons.firstOrNull()?.let { toolButton(it) }
-
         buttons.drop(1).forEach { config ->
             val button = toolButton(config)
             val size = getButtonSize(config)
@@ -72,6 +89,43 @@ class ButtonsBarUi(
             }
             root.addView(button, lParams)
         }
+        insertAsrkbVoiceButton()
+    }
+
+    /**
+     * 把语音按钮插入到主题按钮序列中。
+     *
+     * ### 坐标系换算（关键）
+     * `root` 是 `ROW_REVERSE` 的 FlexboxLayout，视觉上从右往左排：
+     * - 视觉第 1 个主题按钮由 `firstButton` 承载（在 AlwaysUi 的 rightMostButton 里），位于最右；
+     * - `root` 内 addView 索引 0、1、2… 依次对应视觉上的第 2、3、4 个主题按钮。
+     *
+     * 因此视觉插入位 `v` 与 addView 索引的关系为 `addViewIndex = v - 1`：
+     * - v = 0（放在最右）：addView 索引 0，即紧贴 firstButton 左侧；
+     * - v = 1（放在第 1 个之前）：同样落在最右，与 v=0 等价；
+     * - v = 2：插在视觉第 1、2 个之间 → addView 索引 1；
+     * - v 超过总数：钳制到末尾，即最左端。
+     *
+     * 语音按钮参与 flex 布局（flexShrink=0），因此不会与任何主题按钮重叠，
+     * 空间不足时由外层横向滚动条接管。
+     */
+    private fun insertAsrkbVoiceButton() {
+        val button = asrkbVoiceButtonView ?: return
+        if (button.parent != null) return
+        val total = theme.toolBar.buttons.size
+        val visualIndex = asrkbVoiceIndex.coerceIn(0, total)
+        val addIndex = if (visualIndex <= 1) {
+            0
+        } else {
+            (visualIndex - 1).coerceIn(0, root.childCount)
+        }
+        val config = theme.toolBar.buttons.firstOrNull()
+        val size = getButtonSize(config)
+        val lParams = FlexboxLayout.LayoutParams(size.first, size.second).apply {
+            marginEnd = ctx.dp(theme.toolBar.buttonSpacing)
+            flexShrink = 0f
+        }
+        root.addView(button, addIndex, lParams)
     }
 
     internal fun getButtonSize(config: ToolBar.Button?, customDefaultSize: Int = defaultButtonSize): Pair<Int, Int> {

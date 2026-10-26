@@ -15,6 +15,7 @@ import com.osfans.trime.ime.candidates.popup.PopupCandidatesLayout
 import com.osfans.trime.ime.candidates.popup.PopupCandidatesMode
 import com.osfans.trime.ime.composition.PopupPosition
 import com.osfans.trime.ime.core.InlinePreeditMode
+import com.osfans.trime.data.theme.ThemeManager
 import com.osfans.trime.util.InputMethodUtils
 import com.osfans.trime.util.appContext
 import java.lang.ref.WeakReference
@@ -146,6 +147,7 @@ class AppPrefs(
             const val ASRKB_AIDL_VOICE_INPUT = "asrkb_aidl_voice_input"
             const val ASRKB_DUCK_MEDIA_ON_RECORD = "asrkb_duck_media_on_record"
             const val ASRKB_AIDL_VOICE_TOOLBAR_BUTTON = "asrkb_aidl_voice_toolbar_button"
+            const val ASRKB_VOICE_BUTTON_POSITION = "asrkb_voice_button_position"
         }
 
         val inlinePreeditMode = enum(R.string.inline_preedit_mode, INLINE_PREEDIT_MODE, InlinePreeditMode.DISABLE)
@@ -172,6 +174,40 @@ class AppPrefs(
             R.string.asrkb_aidl_voice_toolbar_button_summary,
             enableUiOn = { asrkbAidlVoiceInputEnabled.getValue() },
         )
+        /**
+         * 语音按钮在工具栏中的插入位置。
+         *
+         * 取值含义：0 表示放在所有主题按钮之后（最右）；
+         * N(N>=1) 表示插在主题 yaml 里第 N 个按钮之前。
+         * 若 N 超过主题按钮总数，则自动放在最左端（即所有按钮之后）。
+         *
+         * 选项列表按当前主题的按钮数量动态生成，避免用户选到无意义的值。
+         */
+        val asrkbVoiceButtonPosition = list(
+            R.string.asrkb_voice_button_position,
+            ASRKB_VOICE_BUTTON_POSITION,
+            "0",
+            entryValues = {
+                val count = runCatching {
+                    ThemeManager.activeTheme.toolBar.buttons.size
+                }.getOrDefault(0)
+                (0..count).map { it.toString() }
+            },
+            entryLabels = { ctx ->
+                val count = runCatching {
+                    ThemeManager.activeTheme.toolBar.buttons.size
+                }.getOrDefault(0)
+                (0..count).map { i ->
+                    if (i == 0) {
+                        ctx.getString(R.string.asrkb_voice_button_position_end)
+                    } else {
+                        ctx.getString(R.string.asrkb_voice_button_position_before, i)
+                    }
+                }
+            },
+            enableUiOn = { asrkbAidlVoiceInputEnabled.getValue() && asrkbAidlVoiceToolbarButtonEnabled.getValue() },
+        )
+
 
         val preferredVoiceInput = list(
             R.string.preferred_voice_input,

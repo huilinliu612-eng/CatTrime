@@ -122,13 +122,13 @@ class InputBarDelegate : InputBroadcastReceiver {
      */
     fun refreshAsrkbVoiceButton(button: ToolButton = alwaysUi.asrkbVoiceButton) {
         if (!isAsrkbVoiceButtonEnabled()) {
-            // 功能关闭：真正移除占位（GONE）。此时 rightMostButton 的约束
-            // endToStartOf(asrkbVoiceButton) 会塌缩回父容器右边，与原版一致。
+            // 功能关闭：GONE，FlexboxLayout 会把 GONE 的子视图移出流式布局，
+            // 因此不占位，主题按钮恢复原样。
             button.visibility = View.GONE
             return
         }
-        // 功能开启但处于空闲态：仍用 INVISIBLE 占位，保证 animator 区域
-        // 不会扩展到语音按钮下方，从而不遮挡主题自定义的工具栏按钮。
+        // 功能开启：正常显示。按钮已在 buttonsUi 的序列里，
+        // 与主题按钮一起参与 flex 布局，空间不足时有横向滚动，不会重叠。
         button.visibility = View.VISIBLE
         button.setIcon(
             if (AsrkbSpeechClient.isHolding()) {
@@ -188,8 +188,15 @@ class InputBarDelegate : InputBroadcastReceiver {
         }
     }
 
+    /** 语音按钮在工具栏序列中的插入位置，0 = 最右（所有主题按钮之后）。 */
+    private fun asrkbVoiceButtonPosition(): Int {
+        val raw = runCatching {
+            prefs.general.asrkbVoiceButtonPosition.getValue()
+        }.getOrDefault("0")
+        return raw.toIntOrNull()?.coerceAtLeast(0) ?: 0
+    }
     private val alwaysUi: AlwaysUi by lazy {
-        AlwaysUi(context, theme) { action ->
+        AlwaysUi(context, theme, asrkbVoicePosition = asrkbVoiceButtonPosition()) { action ->
             if (action.isNotEmpty()) {
                 commonKeyboardActionListener.listener.onAction(KeyActionManager.getAction(action))
             } else {
