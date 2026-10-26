@@ -8,13 +8,25 @@ package com.osfans.trime.ime.keyboard
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
+import android.view.Gravity
+import android.view.View
 import android.widget.FrameLayout
+import androidx.annotation.ColorInt
 import androidx.core.view.children
+import androidx.transition.Slide
+import androidx.transition.TransitionManager
+import androidx.transition.TransitionSet
 import com.osfans.trime.data.prefs.AppPrefs
+import com.osfans.trime.data.theme.ColorManager
 import com.osfans.trime.data.theme.Theme
 import com.osfans.trime.ime.broadcast.EnterKeyDisplayDelegate
 import com.osfans.trime.ime.core.TrimeInputMethodService
 import com.osfans.trime.ime.popup.PopupDelegate
+import com.osfans.trime.ime.voice.WaveformView
+import com.osfans.trime.link.AsrkbSpeechClient
+import com.osfans.trime.link.VoiceOverlayUiBridge
+import timber.log.Timber
 
 // TODO: move layout calculation responsibilities from Keyboard to KeyboardView using ConstraintLayout
 @SuppressLint("ViewConstructor")
@@ -39,6 +51,8 @@ class KeyboardView(
     internal val hookShiftArrow: Boolean by AppPrefs.defaultInstance().keyboard.hookShiftArrow
     internal val hideKeySymbol: Boolean by AppPrefs.defaultInstance().keyboard.hideKeySymbol
     internal val hideKeyHint: Boolean by AppPrefs.defaultInstance().keyboard.hideKeyHint
+    private var voiceOverlay: FrameLayout? = null
+    private var voiceWave: WaveformView? = null
 
     init {
         setWillNotDraw(false)
@@ -100,6 +114,108 @@ class KeyboardView(
         get() = keyboard.mShiftKey?.isOn == true
 
     fun onDetach() {
+        if (AsrkbSpeechClient.isHolding()) {
+            hideVoiceOverlay()
+            VoiceOverlayUiBridge.clear()
+            AsrkbSpeechClient.stopHoldSession()
+        } else {
+            hideVoiceOverlay()
+            VoiceOverlayUiBridge.clear()
+        }
         popup.dismissAll()
+    }
+
+    internal fun showVoiceOverlay() {
+        if (voiceOverlay != null) return
+        val bgColor =
+            runCatching { ColorManager.getColor("keyboard_back_color") }.getOrElse { Color.BLACK }
+        val overlay =
+            FrameLayout(context).apply {
+                layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
+                isClickable = false
+                isFocusable = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                runCatching {
+                    ColorManager.getDecorDrawable("keyboard_background")?.also { background = it }
+                }.onFailure { Timber.d(it, "Resolve keyboard_background drawable failed") }
+                if (background == null) setBackgroundColor(bgColor)
+            }
+        val candidateColors =
+            listOf(
+                "key_text_color",
+                "hilited_key_text_color",
+                "candidate_text_color",
+                "hilited_candidate_text_color",
+            ).mapNotNull { key ->
+                runCatching { ColorManager.getColor(key) }.getOrNull()
+            }
+        val lineColor =
+            candidateColors.firstOrNull { contrastRatio(it, bgColor) >= 2.5 }
+                ?: candidateColors.firstOrNull()
+                ?: Color.WHITE
+        val wave =
+            WaveformView(context).apply {
+                setWaveformColor(lineColor)
+                visibility = View.INVISIBLE
+            }
+        overlay.addView(wave, FrameLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        val transition =
+            TransitionSet().apply {
+                addTransition(Slide(Gravity.BOTTOM).apply { addTarget(overlay) })
+                duration = 100
+            }
+        runCatching { TransitionManager.beginDelayedTransition(this, transition) }
+            .onFailure { Timber.d(it, "Begin voice overlay transition failed") }
+        addView(overlay, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
+        voiceOverlay = overlay
+        voiceWave = wave
+    }
+
+    internal fun hideVoiceOverlay() {
+        val overlay = voiceOverlay ?: return
+        runCatching { voiceWave?.stop() }.onFailure { Timber.w(it, "Stop WaveformView failed") }
+        val transition =
+            TransitionSet().apply {
+                addTransition(Slide(Gravity.BOTTOM).apply { addTarget(overlay) })
+                duration = 100
+            }
+        runCatching { TransitionManager.beginDelayedTransition(this, transition) }
+            .onFailure { Timber.d(it, "Begin voice overlay transition failed") }
+        runCatching { removeView(overlay) }.onFailure { Timber.w(it, "Remove voice overlay failed") }
+        voiceOverlay = null
+        voiceWave = null
+    }
+
+    internal fun startVoiceOverlayWave() {
+        val wave = voiceWave ?: return
+        wave.visibility = View.VISIBLE
+        wave.start()
+    }
+
+    internal fun updateVoiceOverlayAmplitude(amplitude: Float) {
+        voiceWave?.updateAmplitude(amplitude)
+    }
+
+    /** WCAG 相对对比度，用于挑选与背景对比度足够的波形颜色。 */
+    private fun contrastRatio(
+        @ColorInt color1: Int,
+        @ColorInt color2: Int,
+    ): Double {
+        val l1 = relativeLuminance(color1)
+        val l2 = relativeLuminance(color2)
+        val lighter = maxOf(l1, l2)
+        val darker = minOf(l1, l2)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    private fun relativeLuminance(@ColorInt color: Int): Double {
+        fun channel(c: Int): Double {
+            val s = c / 255.0
+            return if (s <= 0.03928) s / 12.92 else Math.pow((s + 0.055) / 1.055, 2.4)
+        }
+        val r = channel(Color.red(color))
+        val g = channel(Color.green(color))
+        val b = channel(Color.blue(color))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
 }

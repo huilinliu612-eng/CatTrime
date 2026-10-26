@@ -66,11 +66,14 @@ import kotlinx.coroutines.launch
 import splitties.bitflags.hasFlag
 import splitties.systemservices.clipboardManager
 import splitties.systemservices.inputMethodManager
+import com.osfans.trime.link.AsrkbClipboardSyncBridge
+import com.osfans.trime.link.AsrkbSpeechClient
 import timber.log.Timber
 
 /** [輸入法][InputMethodService]主程序  */
 
 open class TrimeInputMethodService : LifecycleInputMethodService() {
+    private val asrkbClipboardSyncBridge by lazy { AsrkbClipboardSyncBridge(this) }
     private lateinit var rime: RimeSession
     private val jobs = Channel<Job>(capacity = Channel.UNLIMITED)
 
@@ -295,6 +298,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         InputFeedbackManager.init(this)
         registerReceiver()
         super.onCreate()
+        asrkbClipboardSyncBridge.create()
         Timber.d("onCreate")
         decorView = window.window!!.decorView
         contentView = decorView.findViewById(android.R.id.content)
@@ -454,9 +458,18 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
 
     /** Set once [onDestroy] has run; guards work that resumes after a suspension. */
     private var destroyed = false
-
+    override fun onWindowShown() {
+        super.onWindowShown()
+        asrkbClipboardSyncBridge.windowShown()
+    }
+    override fun onWindowHidden() {
+        asrkbClipboardSyncBridge.windowHidden()
+        super.onWindowHidden()
+    }
     override fun onDestroy() {
         destroyed = true
+        AsrkbSpeechClient.onServiceDestroyed(this)
+        asrkbClipboardSyncBridge.destroy()
         InputFeedbackManager.destroy()
         // The dialog borrows this service's window token, so leaving it up while
         // the service goes away leaks the window.
@@ -482,6 +495,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
                 return
             }
             if (!actionLabel.isNullOrEmpty() && actionId != EditorInfo.IME_ACTION_UNSPECIFIED) {
+                AsrkbSpeechClient.onEditorAction()
                 currentInputConnection.performEditorAction(actionId)
                 return
             }
@@ -490,7 +504,10 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
                 EditorInfo.IME_ACTION_NONE,
                 -> sendDownUpKeyEvents(KeyEvent.KEYCODE_ENTER)
 
-                else -> currentInputConnection.performEditorAction(action)
+                else -> {
+                    AsrkbSpeechClient.onEditorAction()
+                    currentInputConnection.performEditorAction(action)
+                }
             }
         }
     }
@@ -612,6 +629,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         )
         cursorUpdateIndex += 1
         handleCursorUpdate(newSelStart, newSelEnd, candidatesStart, candidatesEnd, cursorUpdateIndex)
+        AsrkbSpeechClient.onEditorEvent(this)
         inputView?.updateSelection(newSelStart, newSelEnd)
     }
 
@@ -730,6 +748,7 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         attribute: EditorInfo,
         restarting: Boolean,
     ) {
+        AsrkbSpeechClient.onStartInput(attribute, restarting)
         composingText = ""
         Timber.d("onStartInput: restarting=$restarting")
         val isNullType = attribute.inputType and InputType.TYPE_MASK_CLASS == InputType.TYPE_NULL
@@ -782,6 +801,10 @@ open class TrimeInputMethodService : LifecycleInputMethodService() {
         }
     }
 
+    override fun onFinishInput() {
+        AsrkbSpeechClient.onFinishInput()
+        super.onFinishInput()
+    }
     override fun onFinishInputView(finishingInput: Boolean) {
         Timber.d("onFinishInputView: finishingInput=$finishingInput")
         // A picker is only drawn while the keyboard is up, so it has to go with it.

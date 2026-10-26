@@ -6,6 +6,7 @@
 package com.osfans.trime.ime.bar.ui
 
 import android.content.Context
+import android.view.View
 import android.widget.HorizontalScrollView
 import android.widget.ViewAnimator
 import androidx.annotation.DrawableRes
@@ -70,6 +71,12 @@ class AlwaysUi(
     val inlineSuggestionsUi = InlineSuggestionsUi(ctx)
 
     val hideKeyboardButton = ToolButton(ctx, R.drawable.ic_baseline_arrow_drop_down_24)
+
+    /** 说点啥 AIDL 语音输入工具栏按钮：点按开始录音，再次点按停止并上屏。 */
+    val asrkbVoiceButton =
+        ToolButton(ctx, R.drawable.ic_baseline_mic_24).apply {
+            visibility = View.GONE
+        }
     private val rightMostButton =
         ViewAnimator(ctx).apply {
             add(hideKeyboardButton, lParams(matchParent, matchParent))
@@ -131,9 +138,16 @@ class AlwaysUi(
             },
         )
         add(
-            rightMostButton,
+            asrkbVoiceButton,
             lParams(rightWidth, rightHeight) {
                 endOfParent()
+                centerVertically()
+            },
+        )
+        add(
+            rightMostButton,
+            lParams(rightWidth, rightHeight) {
+                before(asrkbVoiceButton)
                 centerVertically()
             },
         )
@@ -141,7 +155,7 @@ class AlwaysUi(
             animator,
             lParams(matchConstraints, matchParent) {
                 after(leftMostButton)
-                before(rightMostButton)
+                before(asrkbVoiceButton)
                 centerVertically()
             },
         )
