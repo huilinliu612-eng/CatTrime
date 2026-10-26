@@ -15,6 +15,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 访问说点啥外部语音服务（AIDL） -->
+    <uses-permission android:name="com.brycewg.asrkb.EXTERNAL_SPEECH" />
+    <uses-permission android:name="com.brycewg.asrkb.pro.EXTERNAL_SPEECH" />
+    <queries>
+        <package android:name="com.brycewg.asrkb" />
+        <package android:name="com.brycewg.asrkb.pro" />
+    </queries>
 
     <application
         android:name="com.osfans.trime.TrimeApplication"
@@ -99,6 +107,10 @@ SPDX-License-Identifier: GPL-3.0-or-later
             android:windowSoftInputMode="stateAlwaysVisible|adjustPan" />
 
         <!-- Using an activity alias to disable/enable the app icon in the launcher -->
+        <activity
+            android:name=".link.MicPermissionActivity"
+            android:exported="false" />
+
         <activity-alias
             android:name="com.osfans.trime.MainLauncherAlias"
             android:exported="true"

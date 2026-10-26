@@ -143,12 +143,35 @@ class AppPrefs(
             const val INLINE_SUGGESTIONS = "inline_suggestions"
             const val PREFERRED_VOICE_INPUT = "preferred_voice_input"
             const val HIDE_STATIC_SWITCHER = "hide_static_switcher"
+            const val ASRKB_AIDL_VOICE_INPUT = "asrkb_aidl_voice_input"
+            const val ASRKB_DUCK_MEDIA_ON_RECORD = "asrkb_duck_media_on_record"
+            const val ASRKB_AIDL_VOICE_TOOLBAR_BUTTON = "asrkb_aidl_voice_toolbar_button"
         }
 
         val inlinePreeditMode = enum(R.string.inline_preedit_mode, INLINE_PREEDIT_MODE, InlinePreeditMode.DISABLE)
         val asciiSwitchTips = switch(R.string.ascii_switch_tips, ASCII_SWITCH_TIPS, true)
         val inlineSuggestions = switch(R.string.inline_suggestions, INLINE_SUGGESTIONS, true)
         val hideStaticSwitcher = bool(HIDE_STATIC_SWITCHER, false)
+        val asrkbAidlVoiceInputEnabled = switch(
+            R.string.asrkb_aidl_voice_input,
+            ASRKB_AIDL_VOICE_INPUT,
+            false,
+            R.string.asrkb_aidl_voice_input_summary,
+        )
+        val asrkbDuckMediaOnRecordEnabled = switch(
+            R.string.asrkb_duck_media_on_record,
+            ASRKB_DUCK_MEDIA_ON_RECORD,
+            true,
+            R.string.asrkb_duck_media_on_record_summary,
+            enableUiOn = { asrkbAidlVoiceInputEnabled.getValue() },
+        )
+        val asrkbAidlVoiceToolbarButtonEnabled = switch(
+            R.string.asrkb_aidl_voice_toolbar_button,
+            ASRKB_AIDL_VOICE_TOOLBAR_BUTTON,
+            false,
+            R.string.asrkb_aidl_voice_toolbar_button_summary,
+            enableUiOn = { asrkbAidlVoiceInputEnabled.getValue() },
+        )
 
         val preferredVoiceInput = list(
             R.string.preferred_voice_input,
