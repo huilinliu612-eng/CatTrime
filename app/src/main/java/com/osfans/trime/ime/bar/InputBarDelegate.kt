@@ -127,7 +127,7 @@ class InputBarDelegate : InputBroadcastReceiver {
     private fun refreshAsrkbVoiceButton(button: ToolButton, alwaysUiRef: AlwaysUi?) {
         if (!isAsrkbVoiceButtonEnabled()) {
             // 功能关闭：GONE，FlexboxLayout 会把 GONE 的子视图移出流式布局，
-            // 因此不占位，主题按钮恢复原样。
+            // 因此不占位，主题按钮恢复原样（已真机验证）。
             button.visibility = View.GONE
             alwaysUiRef?.refreshButtonsScroll()
             return
