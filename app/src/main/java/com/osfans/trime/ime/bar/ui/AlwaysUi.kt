@@ -138,24 +138,27 @@ class AlwaysUi(
             },
         )
         add(
-            asrkbVoiceButton,
+            rightMostButton,
             lParams(rightWidth, rightHeight) {
                 endOfParent()
                 centerVertically()
             },
         )
+        // 语音按钮放在最右按钮左侧：靠 marginEnd 偏移定位。
+        // 它 GONE 时不占位，也不会把 rightMostButton 挤到同一坐标造成重叠。
         add(
-            rightMostButton,
+            asrkbVoiceButton,
             lParams(rightWidth, rightHeight) {
-                before(asrkbVoiceButton)
+                endOfParent()
                 centerVertically()
+                marginEnd = rightWidth
             },
         )
         add(
             animator,
             lParams(matchConstraints, matchParent) {
                 after(leftMostButton)
-                before(asrkbVoiceButton)
+                before(rightMostButton)
                 centerVertically()
             },
         )

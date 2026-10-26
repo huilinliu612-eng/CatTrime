@@ -106,9 +106,34 @@ class InputBarDelegate : InputBroadcastReceiver {
             },
         )
     }
-    private val asrkbAidlVoiceInputEnabled by prefs.general.asrkbAidlVoiceInputEnabled
-    private val asrkbAidlVoiceToolbarButtonEnabled by prefs.general.asrkbAidlVoiceToolbarButtonEnabled
     private var asrkbHoldingChangedListener: ((Boolean) -> Unit)? = null
+
+    /** 语音工具栏按钮是否应该显示：两个开关都开启才显示。 */
+    private fun isAsrkbVoiceButtonEnabled(): Boolean =
+        prefs.general.asrkbAidlVoiceInputEnabled.getValue() &&
+            prefs.general.asrkbAidlVoiceToolbarButtonEnabled.getValue()
+
+    /**
+     * 重新计算工具栏语音按钮的可见性。
+     *
+     * 注意：这段逻辑必须在“每次键盘显示”与“设置变更”时都调用，
+     * 不能只在 AlwaysUi 初始化时计算一次，否则用户后开关设置时图标永远不会出现。
+     */
+    fun refreshAsrkbVoiceButton() {
+        val button = alwaysUi.asrkbVoiceButton
+        if (!isAsrkbVoiceButtonEnabled()) {
+            button.visibility = View.GONE
+            return
+        }
+        button.visibility = View.VISIBLE
+        button.setIcon(
+            if (AsrkbSpeechClient.isHolding()) {
+                R.drawable.ic_baseline_stop_24
+            } else {
+                R.drawable.ic_baseline_mic_24
+            },
+        )
+    }
 
     private var clipboardTimeoutJob: Job? = null
 
@@ -172,25 +197,13 @@ class InputBarDelegate : InputBroadcastReceiver {
                 onSwipe = swipeDownHideKeyboardCallback
             }
             asrkbVoiceButton.apply {
-                val enabled = asrkbAidlVoiceInputEnabled && asrkbAidlVoiceToolbarButtonEnabled
-                if (enabled) {
-                    visibility = View.VISIBLE
-                    setIcon(
-                        if (AsrkbSpeechClient.isHolding()) {
-                            R.drawable.ic_baseline_stop_24
-                        } else {
-                            R.drawable.ic_baseline_mic_24
-                        },
-                    )
-                } else {
-                    visibility = View.GONE
-                }
+                refreshAsrkbVoiceButton()
                 setOnClickListener {
                     if (AsrkbSpeechClient.isHolding()) {
                         stopAsrkbVoiceFromToolbar()
                         return@setOnClickListener
                     }
-                    if (!(asrkbAidlVoiceInputEnabled && asrkbAidlVoiceToolbarButtonEnabled)) {
+                    if (!isAsrkbVoiceButtonEnabled()) {
                         return@setOnClickListener
                     }
                     startAsrkbVoiceFromToolbar()
@@ -364,9 +377,14 @@ class InputBarDelegate : InputBroadcastReceiver {
 
     override fun onStartInput(info: EditorInfo) {
         evalAlwaysUiState()
+        // 每次开始输入时同步语音按钮可见性：用户从设置页返回后会立即生效。
+        refreshAsrkbVoiceButton()
     }
 
     override fun onWindowAttached(window: BoardWindow) {
+        // 每次键盘窗口附着到屏幕时重新计算语音按钮可见性，
+        // 保证用户在设置里开关后切回键盘即可立即生效。
+        refreshAsrkbVoiceButton()
         if (window is BoardWindow.BarBoardWindow) {
             tabUi.setTitle(window.title)
             window.onCreateBarView()?.let { tabUi.addExternal(it, window.showTitle) }
