@@ -73,6 +73,9 @@ class ButtonsBarUi(
     fun attachAsrkbVoiceButton(button: ToolButton, visualIndex: Int) {
         asrkbVoiceButtonView = button
         asrkbVoiceIndex = visualIndex
+        // init 块里插入时 asrkbVoiceButtonView 还是 null，会直接 return。
+        // 因此这里注册后必须补插一次，否则按钮永远不会出现在工具栏里。
+        insertAsrkbVoiceButton()
     }
 
     init {
@@ -111,6 +114,7 @@ class ButtonsBarUi(
      */
     private fun insertAsrkbVoiceButton() {
         val button = asrkbVoiceButtonView ?: return
+        // 幂等：已经插入过就不再重复添加
         if (button.parent != null) return
         val total = theme.toolBar.buttons.size
         val visualIndex = asrkbVoiceIndex.coerceIn(0, total)

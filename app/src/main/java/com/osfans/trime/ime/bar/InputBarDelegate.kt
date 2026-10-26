@@ -125,6 +125,7 @@ class InputBarDelegate : InputBroadcastReceiver {
             // 功能关闭：GONE，FlexboxLayout 会把 GONE 的子视图移出流式布局，
             // 因此不占位，主题按钮恢复原样。
             button.visibility = View.GONE
+            alwaysUi.refreshButtonsScroll()
             return
         }
         // 功能开启：正常显示。按钮已在 buttonsUi 的序列里，
@@ -137,6 +138,8 @@ class InputBarDelegate : InputBroadcastReceiver {
                 R.drawable.ic_baseline_mic_24
             },
         )
+        // 显隐改变会影响工具栏内容宽度，需要重新对齐滚动位置
+        alwaysUi.refreshButtonsScroll()
     }
 
     private var clipboardTimeoutJob: Job? = null

@@ -122,6 +122,25 @@ class AlwaysUi(
      */
     private var buttonsScrolledToStart = false
 
+    /**
+     * 重新对齐工具栏横向滚动容器。
+     *
+     * 语音按钮的显隐会改变 [buttonsUi] 的内容宽度：显示后内容变宽，需要重新计算
+     * 平移量并滚到最右端，否则新插入的按钮落在可视区外、看起来“没显示”。
+     */
+    fun refreshButtonsScroll() {
+        buttonsScroller.requestLayout()
+        buttonsScroller.post {
+            val overflow = buttonsUi.root.width - buttonsScroller.width
+            buttonsUi.root.translationX = (-overflow).coerceAtLeast(0).toFloat()
+            if (overflow > 0) {
+                buttonsScroller.scrollTo(overflow, 0)
+            } else {
+                buttonsScroller.scrollTo(0, 0)
+            }
+        }
+    }
+
     private val buttonsScroller =
         HorizontalScrollView(ctx).apply {
             isHorizontalScrollBarEnabled = false
